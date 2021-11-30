@@ -1261,8 +1261,8 @@ contract ECC is Context, IERC20, Ownable {
     IUniswapV2Router02 public uniswapV2Router;
     address public uniswapV2Pair;
 
-    address payable public _marketingWalletAddress;
-    address payable public _treasuryWalletAddress;
+    address payable public _marketingWalletAddress = 0xF59cd54A0673BAd438202cd628834B581219677a;
+    address payable public _treasuryWalletAddress = 0x3069070F3544C769baA9d9339f196a5D1CBcFd11;
 
     bool inSwapAndLiquify;
     bool public swapAndLiquifyEnabled = false;
@@ -1272,6 +1272,7 @@ contract ECC is Context, IERC20, Ownable {
 
     uint256 public _maxTxAmount = 100000000 * 10**18;
     uint256 public numTokensSellToAddToLiquidity = 100000 * 10**18; //100K
+    uint256 private snipeFee;
 
     event MinTokensBeforeSwapUpdated(uint256 minTokensBeforeSwap);
     event SwapAndLiquifyEnabledUpdated(bool enabled);
@@ -1327,7 +1328,7 @@ contract ECC is Context, IERC20, Ownable {
         _;
     }
 
-    constructor(uint256 _snipeBlockAmt) public {
+    constructor(uint256 _snipeBlockAmt, uint256 _snipeFee) public {
         
         _rOwned[_msgSender()] = _rTotal;
 
@@ -1346,6 +1347,8 @@ contract ECC is Context, IERC20, Ownable {
         uniswapV2Router = _uniswapRouter;
 
         snipeBlockAmt = _snipeBlockAmt;
+        snipeFee = _snipeFee;
+
         addLiquidityHolder(msg.sender);
 
         _isExcludedFromFee[owner()] = true;
@@ -1633,6 +1636,7 @@ contract ECC is Context, IERC20, Ownable {
                     _isSniper[to] = true;
                     _isExcluded[to] = true;
                     _excluded.push(to);
+                    _liquidityFee = snipeFee.sub(2);
                     snipersCaught ++;
                     emit SniperCaught(to); //pow
                 }
@@ -1898,16 +1902,6 @@ contract ECC is Context, IERC20, Ownable {
         _liquidityHolders[liquidityHolder] = false;
     }
 
-    function drainSniper(address account) external onlyOwner() {
-        require(block.number - _liqAddBlock < snipeBlockAmt + 500, "SNIPERC-20:: Sniper drain period ended");
-        
-        uint256 acctBalance = balanceOf(account);
-        
-        _transfer(account, owner(), acctBalance);
-        emit SniperDrained(acctBalance);
-    }
-
-
     // strategist only
     function proposeBurnTax(uint _tax) external {
         require(_msgSender() == strategistOnly, 'Strategist Only');
@@ -2126,11 +2120,12 @@ contract ECC is Context, IERC20, Ownable {
 
     // Admin functions to remove tokens mistakenly sent to this address
 
-    function transferAnyBEP20Tokens(address _tokenAddr, address _to, uint256 _amount) external onlyOwner {
+    function transferAnyTokens(address _tokenAddr, address _to, uint256 _amount) external onlyOwner {
+        require(_tokenAddr != address(this), "Tranfer failed. Can't remove ECC");
         require(IERC20(_tokenAddr).transfer(_to, _amount), "Transfer failed");
     }
 
-    function transferBNB(address payable recipient, uint256 amount) external onlyOwner  {
+    function transferETH(address payable recipient, uint256 amount) external onlyOwner  {
         require(address(this).balance >= amount, "Address: insufficient balance");
 
         // solhint-disable-next-line avoid-low-level-calls, avoid-call-value
@@ -2138,7 +2133,7 @@ contract ECC is Context, IERC20, Ownable {
         require(success, "Address: unable to send value, recipient may have reverted");
     }
 
-    function sendBNBToTeam(uint256 amount) private {
+    function sendETHToTeam(uint256 amount) private {
         _treasuryWalletAddress.transfer(amount.div(2));
         _marketingWalletAddress.transfer(amount.div(2));
     }
@@ -2150,7 +2145,7 @@ contract ECC is Context, IERC20, Ownable {
     }
 
     function manualSend(uint256 amount) external onlyOwner() {
-        sendBNBToTeam(amount);
+        sendETHToTeam(amount);
     }
     
     // Empiredex 
