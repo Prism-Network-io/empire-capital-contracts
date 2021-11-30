@@ -1200,25 +1200,6 @@ contract ECC is Context, IERC20, Ownable {
     using SafeMath for uint256;
     using Address for address;
 
-    struct StratBurnTax {
-        uint256 tax;
-        uint256 proposedTime;
-    }
-
-    struct StratHoldersTax {
-        uint256 tax;
-        uint256 proposedTime;
-    }
-
-    struct StratLiquidityTax {
-        uint256 tax;
-        uint256 proposedTime;
-    }
-
-    StratBurnTax public stratBurnTax; 
-    StratHoldersTax public stratHoldersTax; 
-    StratLiquidityTax public stratLiquidityTax; 
-
     mapping(address => uint256) private _rOwned;
     mapping(address => uint256) private _tOwned;
     mapping(address => mapping(address => uint256)) private _allowances;
@@ -1244,13 +1225,13 @@ contract ECC is Context, IERC20, Ownable {
     uint256 public _portionSwapOne = 6;
     uint256 public _portionSwapTwo = 6;
 
-    uint256 public _sell_liquidityFee = 9;
+    uint256 public _sell_liquidityFee = 900;
     uint256 public _sell_taxFee = 0;
-    uint256 public _sell_burnFee = 1;
+    uint256 public _sell_burnFee = 100;
 
     uint256 public _buy_liquidityFee = 0;
-    uint256 public _buy_taxFee = 9;
-    uint256 public _buy_burnFee = 1;
+    uint256 public _buy_taxFee = 900;
+    uint256 public _buy_burnFee = 100;
     
     uint256 public _totalFees = _taxFee.add(_burnFee).add(_liquidityFee);
 
@@ -1282,9 +1263,6 @@ contract ECC is Context, IERC20, Ownable {
         uint256 tokensIntoLiqudity
     );
 
-    // The minimum time it has to pass before a strat candidate can be approved.
-    uint256 public _approvalDelay;
-    address public strategistOnly;
     address public liquidityAddress;
     address public ownerWallet;
 
@@ -1296,11 +1274,6 @@ contract ECC is Context, IERC20, Ownable {
     uint256 public snipersCaught = 0;
 
     event SniperCaught(address sniperAddress);
-    event NewStratBurnTax(uint256 tax);
-    event NewStratHoldersTax(uint256 tax);
-    event NewStratLiquidityTax(uint256 tax);
-    event UpgradeStrat(uint256 tax);
-    event StrategistUpdated(address strategistOnly);
     event LiquidityAddressUpdated(address liquidityAddress);
     event TakeFeesUpdated(bool takeFee);
     event TradingHalted(bool halted);
@@ -1335,7 +1308,6 @@ contract ECC is Context, IERC20, Ownable {
         //exclude owner and this contract from fee
         _isExcludedFromFee[owner()] = true;
         _isExcludedFromFee[address(this)] = true;
-        _approvalDelay = 1 days; // approval delay on new strategies
         _stopFee = false;
         ownerWallet = _msgSender();
         liquidityAddress = _msgSender();
@@ -1675,12 +1647,16 @@ contract ECC is Context, IERC20, Ownable {
 
         //buy
         if(from == uniswapV2Pair && to != address(uniswapV2Router) && !_isExcludedFromFee[to]) {
-            setBuyTaxes();
+            _liquidityFee = _buy_liquidityFee;
+            _taxFee = _buy_taxFee;
+            _burnFee = _buy_burnFee;
         }
 
         //sell
         if (!inSwapAndLiquify && swapAndLiquifyEnabled && to == uniswapV2Pair) {
-            setSellTaxes();
+            _liquidityFee = _sell_liquidityFee;
+            _taxFee = _sell_taxFee;
+            _burnFee = _sell_burnFee;
         }
 
         //indicates if fee should be deducted from transfer
@@ -1694,25 +1670,7 @@ contract ECC is Context, IERC20, Ownable {
         //transfer amount, it will take tax, burn, liquidity fee
         _tokenTransfer(from, to, amount, takeFee);
 
-        resetTaxes();
-    }
-
-    function setSellTaxes() private { 
-        _liquidityFee = _sell_liquidityFee;
-        _taxFee = _sell_taxFee;
-        _burnFee = _sell_burnFee;
-    }
-
-    function setBuyTaxes() private { 
-        _liquidityFee = _buy_liquidityFee;
-        _taxFee = _buy_taxFee;
-        _burnFee = _buy_burnFee;
-    }
-
-    function resetTaxes() private { 
-        _liquidityFee = _previousLiquidityFee;
-        _taxFee = _previousTaxFee;
-        _burnFee = _previousBurnFee;
+        restoreAllFee();
     }
 
     function swapAndLiquify(uint256 contractTokenBalance) private lockTheSwap {
@@ -1902,102 +1860,15 @@ contract ECC is Context, IERC20, Ownable {
         _liquidityHolders[liquidityHolder] = false;
     }
 
-    // strategist only
-    function proposeBurnTax(uint _tax) external {
-        require(_msgSender() == strategistOnly, 'Strategist Only');
-        require(_tax >= 0 && _tax <= 1500, "Must be a number between 0 and 1500");
-        require(_tax < _totalFees, "Must be a number less than the total fees");
-
-        stratBurnTax = StratBurnTax({tax: _tax, proposedTime: block.timestamp});
-
-        emit NewStratBurnTax(_tax);
-    }
-
-    function proposeHoldersTax(uint _tax) external {
-        require(_msgSender() == strategistOnly, 'Strategist Only');
-        require(_tax >= 0 && _tax <= 1500, "Must be a number between 0 and 1500");
-        require(_tax < _totalFees, "Must be a number less than the total fees");
-
-        stratHoldersTax = StratHoldersTax({
-            tax: _tax,
-            proposedTime: block.timestamp
-        });
-
-        emit NewStratHoldersTax(_tax);
-    }
-
-    function proposeLiquidityTax(uint _tax) external {
-        require(_msgSender() == strategistOnly, 'Strategist Only');
-        require(_tax >= 0 && _tax <= 1500, "Must be a number between 0 and 1500");
-        require(_tax < _totalFees, "Must be a number less than the total fees");
-
-        stratLiquidityTax = StratLiquidityTax({
-            tax: _tax,
-            proposedTime: block.timestamp
-        });
-
-        emit NewStratLiquidityTax(_tax);
-    }
-
-    function upgradeBurnStrat() external {
-        require(_msgSender() == strategistOnly, 'Strategist Only');
-        require(
-            stratBurnTax.proposedTime.add(_approvalDelay) < block.timestamp,
-            "Delay has not passed"
-        );
-
-        emit UpgradeStrat(stratBurnTax.tax);
-
-        _burnFee = stratBurnTax.tax;
-        _totalFees = _burnFee.add(_taxFee).add(_liquidityFee);
-
-        stratBurnTax.tax = 300; // reset to defaults
-        stratBurnTax.proposedTime = 5000000000;
-    }
-
-    function upgradeHoldersStrat() external {
-        require(_msgSender() == strategistOnly, 'Strategist Only');
-        require(
-            stratHoldersTax.proposedTime.add(_approvalDelay) < block.timestamp,
-            "Delay has not passed"
-        );
-
-        emit UpgradeStrat(stratHoldersTax.tax);
-
-        _taxFee = stratHoldersTax.tax;
-        _totalFees = _burnFee.add(_taxFee).add(_liquidityFee);
-
-        stratHoldersTax.tax = 100;  // reset to defaults
-        stratHoldersTax.proposedTime = 5000000000;
-    }
-
-    function upgradeLiquidityStrat() external {
-        require(_msgSender() == strategistOnly, 'Strategist Only');
-        require(
-            stratLiquidityTax.proposedTime.add(_approvalDelay) < block.timestamp,
-            "Delay has not passed"
-        );
-
-        emit UpgradeStrat(stratLiquidityTax.tax);
-
-        _liquidityFee = stratLiquidityTax.tax;
-        _totalFees = _burnFee.add(_taxFee).add(_liquidityFee);
-
-        stratLiquidityTax.tax = 400; // reset to defaults
-        stratLiquidityTax.proposedTime = 5000000000;
-    }
-
-    // strategist & owner only
-
     function setNumTokensSellToAddToLiquidity(uint256 _numTokensSellToAddToLiquidity) external {
-        require(_msgSender() == strategistOnly || _msgSender() == owner(), 'Strategist & Owner Only');
+        require(_msgSender() == owner(), 'Owner Only');
         numTokensSellToAddToLiquidity = _numTokensSellToAddToLiquidity;
 
         emit SetNumTokensSellToAddToLiquidity(numTokensSellToAddToLiquidity);
     }
 
     function setMaxTxPercent(uint256 maxTxPercent) external {
-        require(_msgSender() == strategistOnly || _msgSender() == owner(), 'Strategist & Owner Only');
+        require(_msgSender() == owner(), 'Owner Only');
         _maxTxAmount = _tTotal.mul(maxTxPercent).div(10**(_feeDecimal + 2));
 
         emit SetMaxTxPercent(maxTxPercent);
@@ -2026,11 +1897,6 @@ contract ECC is Context, IERC20, Ownable {
         uniswapV2Pair = IUniswapV2Factory(uniswapV2Router.factory())
             .createPair(address(this), uniswapV2Router.WETH());
     }
-    
-    function setStrategist(address _strategistOnly) external onlyOwner() {
-        strategistOnly = _strategistOnly;
-        emit StrategistUpdated(_strategistOnly);
-    }
 
     function setLiquidityAddress(address _liquidityAddress) external onlyOwner() {
         require(
@@ -2045,12 +1911,6 @@ contract ECC is Context, IERC20, Ownable {
     function setStopFee(bool stopFee) external onlyOwner() {
         _stopFee = stopFee;
         emit TakeFeesUpdated(stopFee);
-    }
-
-    function _setApprovalDelay(uint256 approvalDelay) external onlyOwner() {
-        _approvalDelay = approvalDelay;
-
-        emit ApprovalDelay(_approvalDelay, approvalDelay);
     }
     
     function _setBurnFee(uint256 burnFee) external onlyOwner() {
