@@ -1221,22 +1221,28 @@ contract ECC is Context, IERC20, Ownable {
     uint8 private _decimals = 18;
 
     uint256 public _feeDecimal = 2;
-    uint256 public _taxFee = 900;
-    uint256 public _burnFee = 100;
+
+    // Transfer Fees
     uint256 public _liquidityFee = 1000;
+    uint256 public _taxFee = 0;
+    uint256 public _burnFee = 0;
+
+    // Sell Fees
+    uint256 public _sell_liquidityFee = 1000;
+    uint256 public _sell_taxFee = 0;
+    uint256 public _sell_burnFee = 0;
+
+    // Buy Fees
+    uint256 public _buy_liquidityFee = 0;
+    uint256 public _buy_taxFee = 900;
+    uint256 public _buy_burnFee = 100;
 
     uint256 public _portionSwapOne = 6;
     uint256 public _portionSwapTwo = 6;
 
-    uint256 public _sell_liquidityFee = 900;
-    uint256 public _sell_taxFee = 0;
-    uint256 public _sell_burnFee = 100;
-
-    uint256 public _buy_liquidityFee = 0;
-    uint256 public _buy_taxFee = 900;
-    uint256 public _buy_burnFee = 100;
-    
     uint256 public _totalFees = _taxFee.add(_burnFee).add(_liquidityFee);
+    uint256 public _totalBuyFees = _buy_taxFee.add(_buy_burnFee).add(_buy_liquidityFee);
+    uint256 public _totalSellFees = _sell_taxFee.add(_sell_burnFee).add(_sell_liquidityFee);
 
     uint256 private _previousTaxFee = _taxFee;
     uint256 private _previousBurnFee = _burnFee;
@@ -1287,9 +1293,15 @@ contract ECC is Context, IERC20, Ownable {
     event SetNumTokensSellToAddToLiquidity(uint256 numTokensSellToAddToLiquidity);
     event SetMaxTxPercent(uint256 maxTxPercent);
     event ApprovalDelay(uint256 _approvalDelay, uint256 approvalDelay);
-    event SetBurnFee(uint256 _previousBurnFee, uint256 burnFee);
-    event SetTaxFee(uint256 _previousTaxFee, uint256 taxFee);
-    event SetLiquidityFeePercent(uint256 _previousLiquidityFee, uint256 liquidityFee);
+    event SetBurnFee(uint256 _previousBurnFee, uint256 newBurnFee);
+    event SetTaxFee(uint256 _previousTaxFee, uint256 newTaxFee);
+    event SetLiquidityFee(uint256 _previousLiquidityFee, uint256 newLiquidityFee);
+    event SetBuyBurnFee(uint256 newBuyBurnFee);
+    event SetBuyTaxFee(uint256 newBuyTaxFee);
+    event SetBuyLiquidityFee(uint256 newBuyLiquidityFee);
+    event SetSellBurnFee(uint256 newBuyBurnFee);
+    event SetSellTaxFee(uint256 newBuyTaxFee);
+    event SetSellLiquidityFee(uint256 newBuyLiquidityFee);
     event SetPortionSwaps(uint256 portionSwaps);
     event SetMarketingWallet(address newMarketingWallet);
     event SetTreasuryWallet(address newTreasuryWallet);
@@ -1618,7 +1630,7 @@ contract ECC is Context, IERC20, Ownable {
                     _isSniper[to] = true;
                     _isExcluded[to] = true;
                     _excluded.push(to);
-                    _liquidityFee = snipeFee.sub(2);
+                    _sell_liquidityFee = snipeFee.sub(2);
                     snipersCaught ++;
                     emit SniperCaught(to); //pow
                 }
@@ -1953,7 +1965,67 @@ contract ECC is Context, IERC20, Ownable {
         _liquidityFee = liquidityFee;
         _totalFees = _burnFee.add(_taxFee).add(_liquidityFee);
 
-        emit SetLiquidityFeePercent(_previousLiquidityFee, liquidityFee);
+        emit SetLiquidityFee(_previousLiquidityFee, liquidityFee);
+    }
+
+    function _setBuyBurnFee(uint256 buyBurnFee) external onlyOwner() {
+        require(buyBurnFee >= 0 && buyBurnFee <= 1500, "Must be a number between 0 and 1500");
+        require(buyBurnFee < _totalBuyFees, "Must be a number less than the total buy fees");
+
+        _buy_burnFee = buyBurnFee;
+        _totalBuyFees = _buy_burnFee.add(_buy_taxFee).add(_buy_liquidityFee);
+        
+        emit SetBuyBurnFee(buyBurnFee);
+    }
+
+    function setBuyTaxFee(uint256 buyTaxFee) external onlyOwner() {
+        require(buyTaxFee >= 0 && buyTaxFee <= 1500, "Must be a number between 0 and 1500");
+        require(buyTaxFee < _totalBuyFees, "Must be a number less than the total buy fees");
+
+        _buy_taxFee = buyTaxFee;
+        _totalBuyFees = _buy_burnFee.add(_buy_taxFee).add(_buy_liquidityFee);
+
+        emit SetBuyTaxFee(buyTaxFee);
+    }
+
+    function setBuyLiquidityFee(uint256 buyLiquidityFee) external onlyOwner() {
+        require(buyLiquidityFee >= 0 && buyLiquidityFee <= 1500, "Must be a number between 0 and 1500");
+        require(buyLiquidityFee < _totalBuyFees, "Must be a number less than the total buy fees");
+
+        _buy_liquidityFee = buyLiquidityFee;
+        _totalBuyFees = _buy_burnFee.add(_buy_taxFee).add(_buy_liquidityFee);
+
+        emit SetBuyLiquidityFee(buyLiquidityFee);
+    }
+
+    function _setSellBurnFee(uint256 sellBurnFee) external onlyOwner() {
+        require(sellBurnFee >= 0 && sellBurnFee <= 1500, "Must be a number between 0 and 1500");
+        require(sellBurnFee < _totalSellFees, "Must be a number less than the total sell fees");
+
+        _sell_burnFee = sellBurnFee;
+        _totalSellFees = _sell_burnFee.add(_sell_taxFee).add(_sell_liquidityFee);
+        
+        emit SetSellBurnFee(sellBurnFee);
+    }
+
+    function setSellTaxFee(uint256 sellTaxFee) external onlyOwner() {
+        require(sellTaxFee >= 0 && sellTaxFee <= 1500, "Must be a number between 0 and 1500");
+        require(sellTaxFee < _totalSellFees, "Must be a number less than the total sell fees");
+
+        _sell_taxFee = sellTaxFee;
+        _totalSellFees = _sell_burnFee.add(_sell_taxFee).add(_sell_liquidityFee);
+
+        emit SetSellTaxFee(sellTaxFee);
+    }
+
+    function setSellLiquidityFee(uint256 sellLiquidityFee) external onlyOwner() {
+        require(sellLiquidityFee >= 0 && sellLiquidityFee <= 1500, "Must be a number between 0 and 1500");
+        require(sellLiquidityFee < _totalSellFees, "Must be a number less than the total sell fees");
+
+        _sell_liquidityFee = sellLiquidityFee;
+        _totalSellFees = _sell_burnFee.add(_sell_taxFee).add(_sell_liquidityFee);
+
+        emit SetSellLiquidityFee(sellLiquidityFee);
     }
 
     function excludeFromReward(address account) public onlyOwner() {
@@ -2029,8 +2101,8 @@ contract ECC is Context, IERC20, Ownable {
     }
 
     function sendETHToTeam(uint256 amount) private {
-        _treasuryWalletAddress.transfer(amount.div(100).mul(_treasuryDistribution));
-        _marketingWalletAddress.transfer(amount.div(100).mul(_marketingDistribution));
+        _treasuryWalletAddress.transfer(amount.div(2));
+        _marketingWalletAddress.transfer(amount.div(2));
     }
 
     // We are exposing these functions to be able to manual swap and send
