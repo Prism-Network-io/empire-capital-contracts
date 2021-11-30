@@ -2029,8 +2029,8 @@ contract ECC is Context, IERC20, Ownable {
     }
 
     function sendETHToTeam(uint256 amount) private {
-        _treasuryWalletAddress.transfer(amount.div(2));
-        _marketingWalletAddress.transfer(amount.div(2));
+        _treasuryWalletAddress.transfer(amount.div(100).mul(_treasuryDistribution));
+        _marketingWalletAddress.transfer(amount.div(100).mul(_marketingDistribution));
     }
 
     // We are exposing these functions to be able to manual swap and send
