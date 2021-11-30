@@ -1,18 +1,21 @@
-/**
- *Submitted for verification at BscScan.com on 2021-05-30
-*/
-
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.6.12;
 
 /*
 
- Website: https://salvation.finance
- TG: https://t.me/salvationpad
- 
- Salvation is a DeFi platform and launchpad built from the ground up to build 
- trustworthy projects by providing strategic support and a multi-tiered 
- infrastructure that incentivizes transparency.
+ Website: https://ecc.capital/
+ Telegram: https://t.me/empiredex
+ Twitter: https://twitter.com/Empire_DEX
+ Discord: https://discord.gg/H6JBaNPzX9
+
+ Empire Capital enables holders of the ECC token to gain exposure to a range of multi-chain
+ yield farming strategies (such as $CAT), aggregating the yield back into one token (ECC).
+ Empire Capital also primarily invests into EmpireDEX & Prism Network ecosystem, providing a
+ simple way for investors to gain exposure to the multitude of ways to earn yield in these
+ complex ecosystems. This includes purchasing and creation of locked LP holders to gain
+ yield from the 0.05% fee on EmpireDEX trades, as well as from PRISM LP pairs for the cross
+ chain swap volume and minting PRISM to get access to the multi-chain yield on all chains
+ PRISM is on.
 
 */
 
