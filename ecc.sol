@@ -1242,6 +1242,9 @@ contract ECC is Context, IERC20, Ownable {
     uint256 private _previousBurnFee = _burnFee;
     uint256 private _previousLiquidityFee = _liquidityFee;
 
+    uint256 _treasuryDistribution = 50;
+    uint256 _marketingDistribution = 50;
+
     IUniswapV2Router02 public uniswapV2Router;
     address public uniswapV2Pair;
 
@@ -1287,6 +1290,9 @@ contract ECC is Context, IERC20, Ownable {
     event SetBurnFee(uint256 _previousBurnFee, uint256 burnFee);
     event SetTaxFee(uint256 _previousTaxFee, uint256 taxFee);
     event SetLiquidityFeePercent(uint256 _previousLiquidityFee, uint256 liquidityFee);
+    event SetPortionSwaps(uint256 portionSwaps);
+    event SetMarketingWallet(address newMarketingWallet);
+    event SetTreasuryWallet(address newTreasuryWallet);
     event ReceiveFallback(address,uint256);
     event SniperDrained(uint256);
 
@@ -1735,8 +1741,8 @@ contract ECC is Context, IERC20, Ownable {
 
     function sendETHToCapitalFund(uint256 amount) private { 
         swapTokensForEth(amount); 
-        _treasuryWalletAddress.transfer(address(this).balance.div(2)); 
-        _marketingWalletAddress.transfer(address(this).balance); 
+        _treasuryWalletAddress.transfer(address(this).balance.div(100).mul(_treasuryDistribution)); 
+        _marketingWalletAddress.transfer(address(this).balance.div(100).mul(_marketingDistribution)); 
     }
 
     //this method is responsible for taking all fee, if takeFee is true
@@ -1979,6 +1985,31 @@ contract ECC is Context, IERC20, Ownable {
     function includeInFee(address account) public onlyOwner {
         require(_isExcludedFromFee[account], "Account is already included");
         _isExcludedFromFee[account] = false;
+    }
+
+    function setPortionSwaps(uint256 portionSwap) external onlyOwner {
+        _portionSwapOne = portionSwap;
+        _portionSwapTwo = portionSwap;
+        emit SetPortionSwaps(portionSwap);
+    }
+
+    function setMarketingWallet(address marketingWallet) external onlyOwner {
+        _marketingWalletAddress = marketingWallet;
+        emit SetMarketingWallet(newMarketingWallet);
+    }
+
+    function setMarketingWallet(address treasuryWallet) external onlyOwner {
+        _treasuryWalletAddress = marketingWallet;
+        emit SetTreasuryWallet(treasuryWallet);
+    }
+
+    function setTreasury&MarketingDistribution(uint256 treasuryDistribution, marketingDistribution) external onlyOwner {
+        require(_treasuryDistribution.add(_marketingDistribution) == 100, "Distribution must be 100% total");
+
+        _treasuryDistribution = treasuryDistribution;
+        _marketingDistribution = marketingDistribution;
+
+        emit SetTreasury&MarketingDistribution(treasuryDistribution, marketingDistribution);
     }
 
     // Admin functions to remove tokens mistakenly sent to this address
