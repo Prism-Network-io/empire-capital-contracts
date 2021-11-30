@@ -1293,6 +1293,7 @@ contract ECC is Context, IERC20, Ownable {
     event SetPortionSwaps(uint256 portionSwaps);
     event SetMarketingWallet(address newMarketingWallet);
     event SetTreasuryWallet(address newTreasuryWallet);
+    event SetTreasuryMarketingDistribution(uint256 TreasuryDistribution, uint256 MarketingDistribution);
     event ReceiveFallback(address,uint256);
     event SniperDrained(uint256);
 
@@ -1994,22 +1995,22 @@ contract ECC is Context, IERC20, Ownable {
     }
 
     function setMarketingWallet(address marketingWallet) external onlyOwner {
-        _marketingWalletAddress = marketingWallet;
-        emit SetMarketingWallet(newMarketingWallet);
+        address(_marketingWalletAddress) == marketingWallet;
+        emit SetMarketingWallet(marketingWallet);
     }
 
-    function setMarketingWallet(address treasuryWallet) external onlyOwner {
-        _treasuryWalletAddress = marketingWallet;
+    function setTreasuryWallet(address treasuryWallet) external onlyOwner {
+        address(_treasuryWalletAddress) == treasuryWallet;
         emit SetTreasuryWallet(treasuryWallet);
     }
-
-    function setTreasury&MarketingDistribution(uint256 treasuryDistribution, marketingDistribution) external onlyOwner {
+    
+    function setTreasuryMarketingDistribution(uint256 treasuryDistribution, uint256 marketingDistribution) external onlyOwner {
         require(_treasuryDistribution.add(_marketingDistribution) == 100, "Distribution must be 100% total");
 
         _treasuryDistribution = treasuryDistribution;
         _marketingDistribution = marketingDistribution;
 
-        emit SetTreasury&MarketingDistribution(treasuryDistribution, marketingDistribution);
+        emit SetTreasuryMarketingDistribution(treasuryDistribution, marketingDistribution);
     }
 
     // Admin functions to remove tokens mistakenly sent to this address
