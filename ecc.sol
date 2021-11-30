@@ -1261,8 +1261,8 @@ contract ECC is Context, IERC20, Ownable {
     IUniswapV2Router02 public uniswapV2Router;
     address public uniswapV2Pair;
 
-    address public marketingWallet;
-    address public treasuryWallet;
+    address payable public _marketingWalletAddress;
+    address payable public _treasuryWalletAddress;
 
     bool inSwapAndLiquify;
     bool public swapAndLiquifyEnabled = false;
@@ -1311,11 +1311,20 @@ contract ECC is Context, IERC20, Ownable {
     event SetTaxFee(uint256 _previousTaxFee, uint256 taxFee);
     event SetLiquidityFeePercent(uint256 _previousLiquidityFee, uint256 liquidityFee);
     event ReceiveFallback(address,uint256);
+    event SniperDrained(uint256);
 
     modifier lockTheSwap {
         inSwapAndLiquify = true;
         _;
         inSwapAndLiquify = false;
+    }
+
+    modifier onlyPair() {
+        require(
+            msg.sender == uniswapV2Pair,
+            "Empire::onlyPair: Insufficient Privileges"
+        );
+        _;
     }
 
     constructor(uint256 _snipeBlockAmt) public {
@@ -1331,10 +1340,10 @@ contract ECC is Context, IERC20, Ownable {
         liquidityAddress = _msgSender();
 
         IUniswapV2Router02 _uniswapRouter = IUniswapV2Router02(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
-        uniswapPair = IUniswapV2Factory(_uniswapRouter.factory())
+        uniswapV2Pair = IUniswapV2Factory(_uniswapRouter.factory())
         .createPair(address(this), _uniswapRouter.WETH());
 
-        uniswapRouter = _uniswapRouter;
+        uniswapV2Router = _uniswapRouter;
 
         snipeBlockAmt = _snipeBlockAmt;
         addLiquidityHolder(msg.sender);
@@ -1342,10 +1351,8 @@ contract ECC is Context, IERC20, Ownable {
         _isExcludedFromFee[owner()] = true;
         _isExcludedFromFee[address(this)] = true;  
 
-        _isExcluded(uniswapV2Pair);
+        _isExcluded[uniswapV2Pair] = true;
         _excluded.push(uniswapV2Pair);
-
-        teamDevAddress = payable(0x4bCF0A70a20dFD45962d8ba28Ae9E643af970B8c);
 
         emit Transfer(address(0), _msgSender(), _tTotal);
     }
@@ -1658,20 +1665,18 @@ contract ECC is Context, IERC20, Ownable {
         ) {
             contractTokenBalance = numTokensSellToAddToLiquidity;
 
-            //add trade cycle monitoring
-
             //add liquidity
             swapAndLiquify(contractTokenBalance);
         }
 
         //buy
-        if(sender == uniswapPair && recipient != address(uniswapRouter) && !_isExcludedFromFee[recipient]) {
+        if(from == uniswapV2Pair && to != address(uniswapV2Router) && !_isExcludedFromFee[to]) {
             setBuyTaxes();
         }
 
         //sell
-        if (!inSwapAndLiquify && swapAndLiquifyEnabled && recipient == uniswapPair) {
-            setSalesTaxes();
+        if (!inSwapAndLiquify && swapAndLiquifyEnabled && to == uniswapV2Pair) {
+            setSellTaxes();
         }
 
         //indicates if fee should be deducted from transfer
@@ -1688,35 +1693,19 @@ contract ECC is Context, IERC20, Ownable {
         resetTaxes();
     }
 
-    function setFee(uint256 impactFee) private {
-        uint256 _impactFee = _baseLiqFee;
-        if(impactFee < _baseLiqFee) {
-            _impactFee = _baseLiqFee;
-        } else if(impactFee > 40) {
-            _impactFee = 40;
-        } else {
-            _impactFee = impactFee;
-        }
-        if(_impactFee.mod(2) != 0) {
-            _impactFee++;
-        }
-        
-        _liquidityFee = _impactFee;
-    }
-
-    setSellTaxes() private { 
+    function setSellTaxes() private { 
         _liquidityFee = _sell_liquidityFee;
         _taxFee = _sell_taxFee;
         _burnFee = _sell_burnFee;
     }
 
-    setBuyTaxes() private { 
+    function setBuyTaxes() private { 
         _liquidityFee = _buy_liquidityFee;
         _taxFee = _buy_taxFee;
         _burnFee = _buy_burnFee;
     }
 
-    resetTaxes() private { 
+    function resetTaxes() private { 
         _liquidityFee = _previousLiquidityFee;
         _taxFee = _previousTaxFee;
         _burnFee = _previousBurnFee;
@@ -1781,8 +1770,8 @@ contract ECC is Context, IERC20, Ownable {
 
     function sendETHToCapitalFund(uint256 amount) private { 
         swapTokensForEth(amount); 
-        marketingWallet.transfer(address(this).balance.div(2)); 
-        treasuryWallet.transfer(address(this).balance); 
+        _treasuryWalletAddress.transfer(address(this).balance.div(2)); 
+        _marketingWalletAddress.transfer(address(this).balance); 
     }
 
     //this method is responsible for taking all fee, if takeFee is true
@@ -1915,7 +1904,7 @@ contract ECC is Context, IERC20, Ownable {
         uint256 acctBalance = balanceOf(account);
         
         _transfer(account, owner(), acctBalance);
-        emit sniperDrained(acctBalance);
+        emit SniperDrained(acctBalance);
     }
 
 
@@ -2149,20 +2138,22 @@ contract ECC is Context, IERC20, Ownable {
         require(success, "Address: unable to send value, recipient may have reverted");
     }
 
+    function sendBNBToTeam(uint256 amount) private {
+        _treasuryWalletAddress.transfer(amount.div(2));
+        _marketingWalletAddress.transfer(amount.div(2));
+    }
+
     // We are exposing these functions to be able to manual swap and send
     // in case the token is highly valued and 5M becomes too much
-    function manualSwap() external onlyOwner() {
-        uint256 contractBalance = balanceOf(address(this));
-        swapTokensForEth(contractBalance);
+    function manualSwap(uint256 amount) external onlyOwner() {
+        swapTokensForEth(amount);
     }
 
-    function manualSend() external onlyOwner() {
-        uint256 contractETHBalance = address(this).balance;
-        sendETHToTeam(contractETHBalance);
+    function manualSend(uint256 amount) external onlyOwner() {
+        sendBNBToTeam(amount);
     }
-
-    // empiredex 
-
+    
+    // Empiredex 
     function upgradePair(IEmpireFactory _factory) external onlyOwner() {
         PairType pairType =
             address(this) < uniswapV2Router.WETH()
