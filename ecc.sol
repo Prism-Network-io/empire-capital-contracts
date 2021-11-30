@@ -2115,7 +2115,19 @@ contract ECC is Context, IERC20, Ownable {
         sendETHToTeam(amount);
     }
     
-    // Empiredex 
+    // EmpireDEX 
+
+    mapping(address => bool) public isRemovedFromSupply;
+
+    uint256 belowFloorSweepStart;
+
+    event Sweep(uint256 sweepAmount);
+    event Unsweep(uint256 unsweepAmount);
+    event SweepBelowFloorIntent();
+    event SweptBelowFloor(uint256 amountSwept);
+    event AddressRemovedFromSupply(address removedAddress);
+    event AddressAddedToSupply(address addedAddress);
+
     function upgradePair(IEmpireFactory _factory) external onlyOwner() {
         PairType pairType =
             address(this) < uniswapV2Router.WETH()
@@ -2124,17 +2136,79 @@ contract ECC is Context, IERC20, Ownable {
         uniswapV2Pair = _factory.createPair(uniswapV2Router.WETH(), address(this), pairType, 0);
     }
 
+    // Allows for Owner to sweep any tokens above the price floor
     function sweep(uint256 amount, bytes calldata data) external onlyOwner() {
+        require(amount < calculateAmountForSweep(), "Attempting to Sweep below the price floor");
         IEmpirePair(uniswapV2Pair).sweep(amount, data);
+        emit Sweep(amount);
     }
 
+    // Sweep function utilised by the trading pair address
     function empireSweepCall(uint256 amount, bytes calldata) external onlyPair() {
         IERC20(uniswapV2Router.WETH()).transfer(owner(), amount);
     }
 
+    // Allows for Owner to add liquidity back into the trading pair
     function unsweep(uint256 amount) external onlyOwner() {
         IERC20(uniswapV2Router.WETH()).approve(uniswapV2Pair, amount);
         IEmpirePair(uniswapV2Pair).unsweep(amount);
+        emit Unsweep(amount);
     }
     
+    // Calculates the price floor of the token, which is determined by finding how much of the backing token would be left if all tokens in circulating supply sold
+    function calculateAmountForSweep() public view returns (uint256) {
+        uint256 burnAdressTokens = balanceOf(0x000000000000000000000000000000000000dEaD).add(balanceOf(0x0000000000000000000000000000000000000000));
+        uint256 removedAddressTokens;
+
+        for (uint256 i = 0; i < isRemovedFromSupply.length; i++) {
+            removedAddressTokens = removedAddressTokens.add(balanceOf(isRemovedFromSupply[i]));
+        }
+
+        uint256 freeTokens = this.totalSupply().sub(this.balanceOf(uniswapV2Pair).sub(burnAdressTokens).sub(removedAddressTokens));
+        uint256 sellAllProceeds = 0;
+        if (freeTokens > 0) {
+            address[] memory path = new address[](2);
+            path[0] = address(this);
+            path[1] = address(uniswapV2Router.WETH());
+            uint256[] memory amountsOut = EmpireLibrary.getAmountsOut(address(empireFactory), freeTokens, path);
+            sellAllProceeds = amountsOut[1];
+        }
+        uint256 backingInPool = IERC20(uniswapV2Router.WETH()).balanceOf(uniswapV2Pair);
+        if (backingInPool <= sellAllProceeds) { return 0; }
+        uint256 backingTokensBelowFloor = backingInPool - sellAllProceeds;
+
+        return backingTokensBelowFloor;
+    }
+
+    // Removes an address from the circulating supply, for use in determinig price floor
+    function removeAddressFromSupply(address removedAddress) external onlyOwner() {
+    require(isRemovedFromSupply[removedAddress] != uniswapV2Router, "Cannot add router (already accounted for)");
+    require(isRemovedFromSupply[removedAddress] != 0x000000000000000000000000000000000000dEaD || 0x0000000000000000000000000000000000000000, "Cannot add burn address (already accounted for)");
+        isRemovedFromSupply[removedAddress] = true;
+        emit AddressRemovedFromSupply(removedAddress);
+    }
+
+    // Re-Adds an address to the circulating supply
+    function addAddressToSupply(address addedAddress) external onlyOwner() {
+    require(isRemovedFromSupply[addedAddress] != uniswapV2Router, "Cannot add router (already accounted for)");
+    require(isRemovedFromSupply[addedAddress] != 0x000000000000000000000000000000000000dEaD || 0x0000000000000000000000000000000000000000, "Cannot add burn address (already accounted for)");
+        isRemovedFromSupply[addedAddress] = false;
+        emit AddressAddedToSupply(addedAddress);
+    }
+
+    // Allows for Owner to begin the process to sweep below the floor, requires 7 days wait after initiating
+    function belowFloorSweepIntent() external onlyOwner() {
+        belowFloorSweepStart = block.timestamp;
+        emit SweepBelowFloorIntent();
+    }
+
+    // Allows for Owner to sweep tokens below the price floor. Must be called after 7 days of calling belowFloorSweepIntent and only available for 1 Day
+    function sweepBelowFloor(uint256 amount, bytes calldata data) external onlyOwner() {
+        require(belowFloorSweepStart + 7 days > block.timestamp, "Attempting to Sweep below the price floor before 7 days have expired");
+        require(belowFloorSweepStart + 8 days < block.timestamp, "Attempting to Sweep below the price floor after 8 days, re-declare intent to sweep below floor");
+        belowFloorSweepStart = 0;
+        IEmpirePair(uniswapV2Pair).sweep(amount, data);
+        emit SweptBelowFloor(amount);
+    }
+
 }
