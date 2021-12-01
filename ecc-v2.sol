@@ -1211,12 +1211,12 @@ contract ECC is Context, IERC20, Ownable {
     address[] private _excluded;
 
     uint256 private constant MAX = ~uint256(0);
-    uint256 private _tTotal = 100000000 * 10**18; //100M 
+    uint256 private _tTotal = 100000000 * 10**9; //100M 
     uint256 private _rTotal = (MAX - (MAX % _tTotal));
     uint256 private _tFeeTotal;
     uint256 private _tBurnTotal;
 
-    string private _name = "Empire Capital";
+    string private _name = "Empire Capital Token";
     string private _symbol = "ECC";
     uint8 private _decimals = 9;
 
@@ -1237,8 +1237,7 @@ contract ECC is Context, IERC20, Ownable {
     uint256 public _buy_taxFee = 900;
     uint256 public _buy_burnFee = 100;
 
-    uint256 public _portionSwapOne = 6;
-    uint256 public _portionSwapTwo = 6;
+    uint256 public _portionSwap = 10;
 
     uint256 public _totalFees = _taxFee.add(_burnFee).add(_liquidityFee);
     uint256 public _totalBuyFees = _buy_taxFee.add(_buy_burnFee).add(_buy_liquidityFee);
@@ -1258,13 +1257,13 @@ contract ECC is Context, IERC20, Ownable {
     address payable public _treasuryWalletAddress = 0x3069070F3544C769baA9d9339f196a5D1CBcFd11;
 
     bool inSwapAndLiquify;
-    bool public swapAndLiquifyEnabled = false;
+    bool public swapAndLiquifyEnabled = true;
 
     //indicates if fee should be deducted from transfer
     bool public _stopFee;
 
-    uint256 public _maxTxAmount = 100000000 * 10**18;
-    uint256 public numTokensSellToAddToLiquidity = 100000 * 10**18; //100K
+    uint256 public _maxTxAmount = 100000000 * 10**9;
+    uint256 public numTokensSellToAddToLiquidity = 100000 * 10**9; //100K
 
     event MinTokensBeforeSwapUpdated(uint256 minTokensBeforeSwap);
     event SwapAndLiquifyEnabledUpdated(bool enabled);
@@ -1692,8 +1691,8 @@ contract ECC is Context, IERC20, Ownable {
     }
 
     function swapAndLiquify(uint256 contractTokenBalance) private lockTheSwap {
-        uint256 halfOfLiquify = contractTokenBalance.div(_portionSwapOne);
-        uint256 otherHalfOfLiquify = contractTokenBalance.div(_portionSwapTwo);
+        uint256 halfOfLiquify = contractTokenBalance.div(_portionSwap);
+        uint256 otherHalfOfLiquify = contractTokenBalance.div(_portionSwap);
         uint256 portionForFees = contractTokenBalance.sub(halfOfLiquify).sub(otherHalfOfLiquify);
 
         // capture the contract's current ETH balance.
@@ -2057,8 +2056,7 @@ contract ECC is Context, IERC20, Ownable {
     }
 
     function setPortionSwaps(uint256 portionSwap) external onlyOwner {
-        _portionSwapOne = portionSwap;
-        _portionSwapTwo = portionSwap;
+        _portionSwap = portionSwap;
         emit SetPortionSwaps(portionSwap);
     }
 
@@ -2114,7 +2112,7 @@ contract ECC is Context, IERC20, Ownable {
     // EmpireDEX 
 
     mapping(address => bool) private isRemovedFromSupply;
-    uint256 isRemovedCount;
+    uint256 isRemovedCount; //added splnty
 
     uint256 belowFloorSweepStart;
 
@@ -2151,6 +2149,8 @@ contract ECC is Context, IERC20, Ownable {
         IEmpirePair(uniswapV2Pair).unsweep(amount);
         emit Unsweep(amount);
     }
+
+    //SPLNTY EDITS
     
     // Calculates the price floor of the token, which is determined by finding how much of the backing token would be left if all tokens in circulating supply sold
     // function calculateAmountForSweep() public view returns (uint256) {
@@ -2192,6 +2192,67 @@ contract ECC is Context, IERC20, Ownable {
     // require(isRemovedFromSupply[addedAddress] != 0x000000000000000000000000000000000000dEaD || isRemovedFromSupply[addedAddress] != 0x0000000000000000000000000000000000000000, "Cannot add burn address (already accounted for)");
     //     isRemovedFromSupply[addedAddress] = false;
     //     isRemovedCount++;
+    //     emit AddressAddedToSupply(addedAddress);
+    // }
+
+    // // Allows for Owner to begin the process to sweep below the floor, requires 7 days wait after initiating
+    // function belowFloorSweepIntent() external onlyOwner() {
+    //     belowFloorSweepStart = block.timestamp;
+    //     emit SweepBelowFloorIntent();
+    // }
+
+    // // Allows for Owner to sweep tokens below the price floor. Must be called after 7 days of calling belowFloorSweepIntent and only available for 1 Day
+    // function sweepBelowFloor(uint256 amount, bytes calldata data) external onlyOwner() {
+    //     require(belowFloorSweepStart + 7 days > block.timestamp, "Attempting to Sweep below the price floor before 7 days have expired");
+    //     require(belowFloorSweepStart + 8 days < block.timestamp, "Attempting to Sweep below the price floor after 8 days, re-declare intent to sweep below floor");
+    //     belowFloorSweepStart = 0;
+    //     IEmpirePair(uniswapV2Pair).sweep(amount, data);
+    //     emit SweptBelowFloor(amount);
+    // }
+
+
+
+    //TRANQ
+
+
+    //     // Calculates the price floor of the token, which is determined by finding how much of the backing token would be left if all tokens in circulating supply sold
+    // function calculateAmountForSweep() public view returns (uint256) {
+    //     uint256 burnAdressTokens = balanceOf(0x000000000000000000000000000000000000dEaD).add(balanceOf(0x0000000000000000000000000000000000000000));
+    //     uint256 removedAddressTokens;
+
+    //     for (uint256 i = 0; i < isRemovedFromSupply.length; i++) {
+    //         removedAddressTokens = removedAddressTokens.add(balanceOf(isRemovedFromSupply[i]));
+    //     }
+
+    //     uint256 freeTokens = this.totalSupply().sub(this.balanceOf(uniswapV2Pair).sub(burnAdressTokens).sub(removedAddressTokens));
+    //     uint256 sellAllProceeds = 0;
+    //     if (freeTokens > 0) {
+    //         address[] memory path = new address[](2);
+    //         path[0] = address(this);
+    //         path[1] = address(uniswapV2Router.WETH());
+    //         uint256[] memory amountsOut = EmpireLibrary.getAmountsOut(address(empireFactory), freeTokens, path);
+    //         sellAllProceeds = amountsOut[1];
+    //     }
+    //     uint256 backingInPool = IERC20(uniswapV2Router.WETH()).balanceOf(uniswapV2Pair);
+    //     if (backingInPool <= sellAllProceeds) { return 0; }
+    //     uint256 backingTokensBelowFloor = backingInPool - sellAllProceeds;
+
+    //     return backingTokensBelowFloor;
+    // }
+
+    // // Removes an address from the circulating supply, for use in determinig price floor
+    // function removeAddressFromSupply(address removedAddress) external onlyOwner() {
+    // require(isRemovedFromSupply[removedAddress] != uniswapV2Router, "Cannot add router (already accounted for)");
+    // require(isRemovedFromSupply[removedAddress] != 0x000000000000000000000000000000000000dEaD || 0x0000000000000000000000000000000000000000, "Cannot add burn address (already accounted for)");
+    //     isRemovedFromSupply[removedAddress] = true;
+    //     emit AddressRemovedFromSupply(removedAddress);
+    // }
+
+    // // Re-Adds an address to the circulating supply
+    // function addAddressToSupply(address addedAddress) external onlyOwner() {
+    // require(isRemovedFromSupply[addedAddress] != uniswapV2Router, "Cannot add router (already accounted for)");
+    // require(isRemovedFromSupply[addedAddress] != 0x000000000000000000000000000000000000dEaD || 0x0000000000000000000000000000000000000000, "Cannot add burn address (already accounted for)");
+    //     isRemovedFromSupply[addedAddress] = false;
     //     emit AddressAddedToSupply(addedAddress);
     // }
 
