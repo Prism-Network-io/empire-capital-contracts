@@ -1247,7 +1247,7 @@ contract ECC is Context, IERC20, Ownable {
     uint256 private _previousLiquidityFee = _liquidityFee;
 
     uint256 public _feeDecimal = 2;
-    uint256 public _maxTxAmount = 100000000 * 10**9;
+    uint256 public _maxTxAmount = 500000 * 10**9; //500K
     uint256 public numTokensSellToAddToLiquidity = 100000 * 10**9; //100K
     uint256 public _portionSwap = 10;
     uint256 _treasuryDistribution = 50;
@@ -1320,7 +1320,7 @@ contract ECC is Context, IERC20, Ownable {
         ownerWallet = _msgSender();
         liquidityAddress = _msgSender();
 
-        IUniswapV2Router02 _uniswapRouter = IUniswapV2Router02(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
+        IUniswapV2Router02 _uniswapRouter = IUniswapV2Router02(0x9Ac64Cc6e4415144C455BD8E4837Fea55603e5c3); //testnet
         uniswapV2Pair = IUniswapV2Factory(_uniswapRouter.factory())
         .createPair(address(this), _uniswapRouter.WETH());
 
@@ -1904,10 +1904,6 @@ contract ECC is Context, IERC20, Ownable {
         uniswapV2Router = _uniswapV2Router;
     }
     
-    function setPair(address _pairAddress) external onlyOwner() {
-        uniswapV2Pair = _pairAddress;
-    }
-    
     function createPair() external onlyOwner() {
         // Create a uniswap pair for this new token
         uniswapV2Pair = IUniswapV2Factory(uniswapV2Router.factory())
@@ -1946,7 +1942,6 @@ contract ECC is Context, IERC20, Ownable {
         emit SetTaxFee(_previousTaxFee, taxFee);
         emit SetLiquidityFee(_previousLiquidityFee, liquidityFee);
     }
-
 
     function setBuyFees(uint256 buyBurnFee, uint256 buyTaxFee, uint256 buyLiquidityFee) external onlyOwner() {
         require(buyBurnFee >= 0 && buyBurnFee <= 1500 && buyTaxFee >= 0 && buyTaxFee <= 1500 && buyLiquidityFee >= 0 && buyLiquidityFee <= 1500, "Must be a number between 0 and 1500");
