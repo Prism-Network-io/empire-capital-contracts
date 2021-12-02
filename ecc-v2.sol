@@ -2127,7 +2127,6 @@ contract ECC is Context, IERC20, Ownable {
 
     // Allows for Owner to sweep any tokens above the price floor
     function sweep(uint256 amount, bytes calldata data) external onlyOwner() {
-        // require(amount < calculateAmountForSweep(), "Attempting to Sweep below the price floor");
         IEmpirePair(uniswapV2Pair).sweep(amount, data);
         emit Sweep(amount);
     }
