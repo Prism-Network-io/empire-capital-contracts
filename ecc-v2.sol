@@ -1664,7 +1664,6 @@ contract ECC is Context, IERC20, Ownable {
 
         //buy
          if(from == uniswapV2Pair && 
-            to != address(uniswapV2Router) && 
             !inSwapAndLiquify && 
             !_stopFee) {
             _liquidityFee = _buy_liquidityFee;
@@ -1674,7 +1673,6 @@ contract ECC is Context, IERC20, Ownable {
 
         //sell
         if (to == uniswapV2Pair && 
-            to != address(uniswapV2Router) && 
             !inSwapAndLiquify && 
             !_stopFee) {
             _liquidityFee = _sell_liquidityFee;
