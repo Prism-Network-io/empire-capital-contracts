@@ -2122,20 +2122,16 @@ contract ECC is Context, IERC20, Ownable {
     event Sweep(uint256 sweepAmount);
     event Unsweep(uint256 unsweepAmount);
 
-    function createSweepablePair(IEmpireFactory _factory) external onlyOwner() {
+    function createSweepablePair(IEmpireFactory _factory, bool update) external onlyOwner() {
         PairType pairType =
             address(this) < uniswapV2Router.WETH()
                 ? PairType.SweepableToken1
                 : PairType.SweepableToken0;
         sweepablePair = _factory.createPair(uniswapV2Router.WETH(), address(this), pairType, 0);
-    }
 
-    function upgradePair(IEmpireFactory _factory) external onlyOwner() {
-        PairType pairType =
-            address(this) < uniswapV2Router.WETH()
-                ? PairType.SweepableToken1
-                : PairType.SweepableToken0;
-        uniswapV2Pair = _factory.createPair(uniswapV2Router.WETH(), address(this), pairType, 0);
+        if(update) { 
+            uniswapV2Pair = sweepablePair;
+        }
     }
 
     // Allows for Owner to sweep any tokens above the price floor
