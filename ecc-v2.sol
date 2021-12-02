@@ -2136,7 +2136,7 @@ contract ECC is Context, IERC20, Ownable {
 
     // Allows for Owner to sweep any tokens above the price floor
     function sweep(uint256 amount, bytes calldata data) external onlyOwner() {
-        IEmpirePair(uniswapV2Pair).sweep(amount, data);
+        IEmpirePair(sweepablePair).sweep(amount, data);
         emit Sweep(amount);
     }
 
@@ -2147,8 +2147,8 @@ contract ECC is Context, IERC20, Ownable {
 
     // Allows for Owner to add liquidity back into the trading pair
     function unsweep(uint256 amount) external onlyOwner() {
-        IERC20(uniswapV2Router.WETH()).approve(uniswapV2Pair, amount);
-        IEmpirePair(uniswapV2Pair).unsweep(amount);
+        IERC20(uniswapV2Router.WETH()).approve(sweepablePair, amount);
+        IEmpirePair(sweepablePair).unsweep(amount);
         emit Unsweep(amount);
     }
 
