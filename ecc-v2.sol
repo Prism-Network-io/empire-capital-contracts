@@ -1863,7 +1863,7 @@ contract ECC is Context, IERC20, Ownable {
     
     function addSniper(address sniperAddress) external onlyOwner() {
         require(sniperAddress != uniswapV2Pair, "ERC20: Can not add uniswapV2Pair to sniper list");
-        require(sniperAddress != address(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D), "ERC20: Can not add uniswapV2Router to sniper list");
+        require(sniperAddress != address(uniswapV2Router), "ERC20: Can not add uniswapV2Router to sniper list");
 
         _isSniper[sniperAddress] = true;
         
@@ -1883,7 +1883,7 @@ contract ECC is Context, IERC20, Ownable {
         _liquidityHolders[liquidityHolder] = true;
     }
 
-    function setLiquidityRouter(IUniswapV2Router02 liquidityRouter ) external onlyOwner() {
+    function setLiquidityRouter(IUniswapV2Router02 liquidityRouter) external onlyOwner() {
         uniswapV2LiquidityRouter = liquidityRouter;
     }
     
