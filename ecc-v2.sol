@@ -1276,6 +1276,7 @@ contract ECC is Context, IERC20, Ownable {
 
     address public liquidityAddress;
     address public ownerWallet;
+    address public sweepablePair;
 
     mapping (address => bool) private _liquidityHolders;
     mapping (address => bool) private _isSniper;
@@ -2120,6 +2121,14 @@ contract ECC is Context, IERC20, Ownable {
     // EmpireDEX 
     event Sweep(uint256 sweepAmount);
     event Unsweep(uint256 unsweepAmount);
+
+    function createSweepablePair(IEmpireFactory _factory) external onlyOwner() {
+        PairType pairType =
+            address(this) < uniswapV2Router.WETH()
+                ? PairType.SweepableToken1
+                : PairType.SweepableToken0;
+        sweepablePair = _factory.createPair(uniswapV2Router.WETH(), address(this), pairType, 0);
+    }
 
     function upgradePair(IEmpireFactory _factory) external onlyOwner() {
         PairType pairType =
