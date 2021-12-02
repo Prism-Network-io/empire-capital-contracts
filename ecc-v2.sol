@@ -1663,14 +1663,20 @@ contract ECC is Context, IERC20, Ownable {
         }
 
         //buy
-        if(from == uniswapV2Pair && to != address(uniswapV2Router) && !_isExcludedFromFee[to]) {
+         if(from == uniswapV2Pair && 
+            to != address(uniswapV2Router) && 
+            !inSwapAndLiquify && 
+            !_stopFee) {
             _liquidityFee = _buy_liquidityFee;
             _taxFee = _buy_taxFee;
             _burnFee = _buy_burnFee;
         }
 
         //sell
-        if (!inSwapAndLiquify && swapAndLiquifyEnabled && to == uniswapV2Pair) {
+        if (to == uniswapV2Pair && 
+            to != address(uniswapV2Router) && 
+            !inSwapAndLiquify && 
+            !_stopFee) {
             _liquidityFee = _sell_liquidityFee;
             _taxFee = _sell_taxFee;
             _burnFee = _sell_burnFee;
