@@ -1940,96 +1940,52 @@ contract ECC is Context, IERC20, Ownable {
         emit TakeFeesUpdated(stopFee);
     }
     
-    function _setBurnFee(uint256 burnFee) external onlyOwner() {
-        require(burnFee >= 0 && burnFee <= 1500, "Must be a number between 0 and 1500");
-        require(burnFee < _totalFees, "Must be a number less than the total fees");
+    function setFees(uint256 burnFee, uint256 taxFee, uint256 liquidityFee) external onlyOwner() {
+        require(burnFee >= 0 && burnFee <= 1500 && taxFee >= 0 && taxFee <= 1500 && liquidityFee >= 0 && liquidityFee <= 1500, "Must be a number between 0 and 1500");
+        require(burnFee < _totalFees && taxFee < _totalFees && liquidityFee < _totalFees, "Must be a number less than the total fees");
 
         _previousBurnFee = _burnFee;
         _burnFee = burnFee;
+        _previousTaxFee = _taxFee;
+        _taxFee = taxFee;
+        _previousLiquidityFee = _liquidityFee;
+        _liquidityFee = liquidityFee;
+
         _totalFees = _burnFee.add(_taxFee).add(_liquidityFee);
         
         emit SetBurnFee(_previousBurnFee, burnFee);
-    }
-
-    function setTaxFee(uint256 taxFee) external onlyOwner() {
-        require(taxFee >= 0 && taxFee <= 1500, "Must be a number between 0 and 1500");
-        require(taxFee < _totalFees, "Must be a number less than the total fees");
-
-        _previousTaxFee = _taxFee;
-        _taxFee = taxFee;
-        _totalFees = _burnFee.add(_taxFee).add(_liquidityFee);
-
         emit SetTaxFee(_previousTaxFee, taxFee);
-    }
-
-    function setLiquidityFee(uint256 liquidityFee) external onlyOwner() {
-        require(liquidityFee >= 0 && liquidityFee <= 1500, "Must be a number between 0 and 1500");
-        require(liquidityFee < _totalFees, "Must be a number less than the total fees");
-
-        _previousLiquidityFee = _liquidityFee;
-        _liquidityFee = liquidityFee;
-        _totalFees = _burnFee.add(_taxFee).add(_liquidityFee);
-
         emit SetLiquidityFee(_previousLiquidityFee, liquidityFee);
     }
 
-    function _setBuyBurnFee(uint256 buyBurnFee) external onlyOwner() {
-        require(buyBurnFee >= 0 && buyBurnFee <= 1500, "Must be a number between 0 and 1500");
-        require(buyBurnFee < _totalBuyFees, "Must be a number less than the total buy fees");
 
-        _buy_burnFee = buyBurnFee;
-        _totalBuyFees = _buy_burnFee.add(_buy_taxFee).add(_buy_liquidityFee);
+    function setBuyFees(uint256 buyBurnFee, uint256 buyTaxFee, uint256 buyLiquidityFee) external onlyOwner() {
+        require(buyBurnFee >= 0 && buyBurnFee <= 1500 && buyTaxFee >= 0 && buyTaxFee <= 1500 && buyLiquidityFee >= 0 && buyLiquidityFee <= 1500, "Must be a number between 0 and 1500");
+        require(buyBurnFee < _totalBuyFees && buyTaxFee < _totalBuyFees && buyLiquidityFee < _totalBuyFees, "Must be a number less than the total buy fees");
         
-        emit SetBuyBurnFee(buyBurnFee);
-    }
-
-    function setBuyTaxFee(uint256 buyTaxFee) external onlyOwner() {
-        require(buyTaxFee >= 0 && buyTaxFee <= 1500, "Must be a number between 0 and 1500");
-        require(buyTaxFee < _totalBuyFees, "Must be a number less than the total buy fees");
-
+        _buy_burnFee = buyBurnFee;
         _buy_taxFee = buyTaxFee;
-        _totalBuyFees = _buy_burnFee.add(_buy_taxFee).add(_buy_liquidityFee);
-
-        emit SetBuyTaxFee(buyTaxFee);
-    }
-
-    function setBuyLiquidityFee(uint256 buyLiquidityFee) external onlyOwner() {
-        require(buyLiquidityFee >= 0 && buyLiquidityFee <= 1500, "Must be a number between 0 and 1500");
-        require(buyLiquidityFee < _totalBuyFees, "Must be a number less than the total buy fees");
-
         _buy_liquidityFee = buyLiquidityFee;
+
         _totalBuyFees = _buy_burnFee.add(_buy_taxFee).add(_buy_liquidityFee);
 
+        emit SetBuyBurnFee(buyBurnFee);
+        emit SetBuyTaxFee(buyTaxFee);
         emit SetBuyLiquidityFee(buyLiquidityFee);
     }
 
-    function _setSellBurnFee(uint256 sellBurnFee) external onlyOwner() {
-        require(sellBurnFee >= 0 && sellBurnFee <= 1500, "Must be a number between 0 and 1500");
-        require(sellBurnFee < _totalSellFees, "Must be a number less than the total sell fees");
+    function setSellFees(uint256 sellBurnFee, uint256 sellTaxFee, uint256 sellLiquidityFee) external onlyOwner() {
+        require(sellBurnFee >= 0 && sellBurnFee <= 1500 && sellTaxFee >= 0 && sellTaxFee <= 1500 && sellLiquidityFee >= 0 && sellLiquidityFee <= 1500, "Must be a number between 0 and 1500");
+        require(sellBurnFee < _totalSellFees && sellTaxFee < _totalSellFees && sellLiquidityFee < _totalSellFees, "Must be a number less than the total sell fees");
 
         _sell_burnFee = sellBurnFee;
-        _totalSellFees = _sell_burnFee.add(_sell_taxFee).add(_sell_liquidityFee);
-        
-        emit SetSellBurnFee(sellBurnFee);
-    }
-
-    function setSellTaxFee(uint256 sellTaxFee) external onlyOwner() {
-        require(sellTaxFee >= 0 && sellTaxFee <= 1500, "Must be a number between 0 and 1500");
-        require(sellTaxFee < _totalSellFees, "Must be a number less than the total sell fees");
-
         _sell_taxFee = sellTaxFee;
-        _totalSellFees = _sell_burnFee.add(_sell_taxFee).add(_sell_liquidityFee);
-
-        emit SetSellTaxFee(sellTaxFee);
-    }
-
-    function setSellLiquidityFee(uint256 sellLiquidityFee) external onlyOwner() {
-        require(sellLiquidityFee >= 0 && sellLiquidityFee <= 1500, "Must be a number between 0 and 1500");
-        require(sellLiquidityFee < _totalSellFees, "Must be a number less than the total sell fees");
-
         _sell_liquidityFee = sellLiquidityFee;
+
         _totalSellFees = _sell_burnFee.add(_sell_taxFee).add(_sell_liquidityFee);
 
+        emit SetSellBurnFee(sellBurnFee);
+        emit SetSellTaxFee(sellTaxFee);
         emit SetSellLiquidityFee(sellLiquidityFee);
     }
 
