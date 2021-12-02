@@ -2068,12 +2068,12 @@ contract ECC is Context, IERC20, Ownable {
         emit SetPortionSwaps(portionSwap);
     }
 
-    function setMarketingWallet(address marketingWallet) external onlyOwner() {
+    function setMarketingWallet(address payable marketingWallet) external onlyOwner() {
         _marketingWalletAddress = marketingWallet;
         emit SetMarketingWallet(marketingWallet);
     }
 
-    function setTreasuryWallet(address treasuryWallet) external onlyOwner() {
+    function setTreasuryWallet(address payable treasuryWallet) external onlyOwner() {
         _treasuryWalletAddress = treasuryWallet;
         emit SetTreasuryWallet(treasuryWallet);
     }
