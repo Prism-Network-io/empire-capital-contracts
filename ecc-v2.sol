@@ -1428,7 +1428,14 @@ contract ECC is Context, IERC20, Ownable {
     }
 
     function getCirculatingSupply() public view returns (uint256) {
-        return totalSupply().sub(balanceOf(address(0x000000000000000000000000000000000000dEaD)).sub(balanceOf(address(0x0000000000000000000000000000000000000000))));
+        uint256 burnAddressTokens = balanceOf(0x000000000000000000000000000000000000dEaD).add(balanceOf(0x0000000000000000000000000000000000000000));
+        uint256 removedAddressTokens;
+
+        for (uint256 i = 0; i < removedFromCirculation.length; i++) {
+            removedAddressTokens += balanceOf(removedFromCirculation[i]);
+        }
+
+        return totalSupply().sub(burnAddressTokens).sub(removedAddressTokens);
     }
 
     function reflectionFromToken(uint256 tAmount, bool deductTransferFee) public view returns (uint256) {
@@ -2060,6 +2067,11 @@ contract ECC is Context, IERC20, Ownable {
     // EmpireDEX 
     event Sweep(uint256 sweepAmount);
     event Unsweep(uint256 unsweepAmount);
+    event AddressRemovedFromSupply(address removedAddress);
+    event AddressAddedToSupply(address addedAddress);
+
+    address[] public removedFromCirculation;
+    mapping (address=> uint256) public removedAddressIndex;
 
     function createSweepablePair(IEmpireFactory _factory, bool update) external onlyOwner() {
         PairType pairType =
@@ -2089,6 +2101,27 @@ contract ECC is Context, IERC20, Ownable {
         IERC20(uniswapV2Router.WETH()).approve(sweepablePair, amount);
         IEmpirePair(sweepablePair).unsweep(amount);
         emit Unsweep(amount);
+    }
+
+    // Removes an address from the circulating supply
+    function removeAddressFromSupply(address removedAddress) external onlyOwner() {
+        uint256 id = removedFromCirculation.length;
+        require(removedAddress != address(uniswapV2Router), "Cannot add router (already accounted for)");
+        require(removedAddress != 0x000000000000000000000000000000000000dEaD || removedAddress != 0x0000000000000000000000000000000000000000, "Cannot add burn address (already accounted for)");
+        
+        removedAddressIndex[removedAddress] = id;
+        removedFromCirculation.push(removedAddress);
+        emit AddressRemovedFromSupply(removedAddress);
+    }
+
+    // Re-Adds an address to the circulating supply
+    function addAddressToSupply(address addedAddress) external onlyOwner() {
+        uint256 id = removedAddressIndex[addedAddress];
+        require(addedAddress != address(uniswapV2Router), "Cannot add router (already accounted for)");
+        require(addedAddress != 0x000000000000000000000000000000000000dEaD || addedAddress != 0x0000000000000000000000000000000000000000, "Cannot add burn address (already accounted for)");
+
+        delete removedFromCirculation[id];
+        emit AddressAddedToSupply(addedAddress);
     }
 
 }
