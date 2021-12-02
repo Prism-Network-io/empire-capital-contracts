@@ -1755,9 +1755,10 @@ contract ECC is Context, IERC20, Ownable {
     }
 
     function sendETHToCapitalFund(uint256 amount) private { 
-        swapTokensForEth(amount); 
-        _treasuryWalletAddress.transfer(address(this).balance.div(100).mul(_treasuryDistribution)); 
-        _marketingWalletAddress.transfer(address(this).balance.div(100).mul(_marketingDistribution)); 
+        swapTokensForEth(amount);
+        uint256 ethRaised = address(this).balance;
+        _treasuryWalletAddress.transfer(ethRaised.div(100).mul(_treasuryDistribution)); 
+        _marketingWalletAddress.transfer(ethRaised.div(100).mul(_marketingDistribution)); 
     }
 
     //this method is responsible for taking all fee, if takeFee is true
@@ -2104,8 +2105,8 @@ contract ECC is Context, IERC20, Ownable {
     }
 
     function sendETHToTeam(uint256 amount) private {
-        _treasuryWalletAddress.transfer(amount.div(2));
-        _marketingWalletAddress.transfer(amount.div(2));
+        _treasuryWalletAddress.transfer(amount.div(100).mul(_treasuryDistribution)); 
+        _marketingWalletAddress.transfer(amount.div(100).mul(_marketingDistribution)); 
     }
 
     // We are exposing these functions to be able to manual swap and send
