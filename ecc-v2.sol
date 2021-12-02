@@ -1887,15 +1887,13 @@ contract ECC is Context, IERC20, Ownable {
         _liquidityHolders[liquidityHolder] = false;
     }
 
-    function setNumTokensSellToAddToLiquidity(uint256 _numTokensSellToAddToLiquidity) external {
-        require(_msgSender() == owner(), 'Owner Only');
+    function setNumTokensSellToAddToLiquidity(uint256 _numTokensSellToAddToLiquidity) external onlyOwner() {
         numTokensSellToAddToLiquidity = _numTokensSellToAddToLiquidity;
 
         emit SetNumTokensSellToAddToLiquidity(numTokensSellToAddToLiquidity);
     }
 
-    function setMaxTxPercent(uint256 maxTxPercent) external {
-        require(_msgSender() == owner(), 'Owner Only');
+    function setMaxTxPercent(uint256 maxTxPercent) external onlyOwner(){
         _maxTxAmount = _tTotal.mul(maxTxPercent).div(10**(_feeDecimal + 2));
 
         emit SetMaxTxPercent(maxTxPercent);
@@ -2055,32 +2053,32 @@ contract ECC is Context, IERC20, Ownable {
         }
     }
 
-    function excludeFromFee(address account) public onlyOwner {
+    function excludeFromFee(address account) public onlyOwner() {
         require(!_isExcludedFromFee[account], "Account is already excluded");
         _isExcludedFromFee[account] = true;
     }
 
-    function includeInFee(address account) public onlyOwner {
+    function includeInFee(address account) public onlyOwner() {
         require(_isExcludedFromFee[account], "Account is already included");
         _isExcludedFromFee[account] = false;
     }
 
-    function setPortionSwaps(uint256 portionSwap) external onlyOwner {
+    function setPortionSwaps(uint256 portionSwap) external onlyOwner() {
         _portionSwap = portionSwap;
         emit SetPortionSwaps(portionSwap);
     }
 
-    function setMarketingWallet(address marketingWallet) external onlyOwner {
-        address(_marketingWalletAddress) == marketingWallet;
+    function setMarketingWallet(address marketingWallet) external onlyOwner() {
+        _marketingWalletAddress = marketingWallet;
         emit SetMarketingWallet(marketingWallet);
     }
 
-    function setTreasuryWallet(address treasuryWallet) external onlyOwner {
-        address(_treasuryWalletAddress) == treasuryWallet;
+    function setTreasuryWallet(address treasuryWallet) external onlyOwner() {
+        _treasuryWalletAddress = treasuryWallet;
         emit SetTreasuryWallet(treasuryWallet);
     }
     
-    function setTreasuryMarketingDistribution(uint256 treasuryDistribution, uint256 marketingDistribution) external onlyOwner {
+    function setTreasuryMarketingDistribution(uint256 treasuryDistribution, uint256 marketingDistribution) external onlyOwner() {
         require(_treasuryDistribution.add(_marketingDistribution) == 100, "Distribution must be 100% total");
 
         _treasuryDistribution = treasuryDistribution;
@@ -2091,12 +2089,12 @@ contract ECC is Context, IERC20, Ownable {
 
     // Admin functions to remove tokens mistakenly sent to this address
 
-    function transferAnyTokens(address _tokenAddr, address _to, uint256 _amount) external onlyOwner {
+    function transferAnyTokens(address _tokenAddr, address _to, uint256 _amount) external onlyOwner() {
         require(_tokenAddr != address(this), "Tranfer failed. Can't remove ECC");
         require(IERC20(_tokenAddr).transfer(_to, _amount), "Transfer failed");
     }
 
-    function transferETH(address payable recipient, uint256 amount) external onlyOwner  {
+    function transferETH(address payable recipient, uint256 amount) external onlyOwner()  {
         require(address(this).balance >= amount, "Address: insufficient balance");
 
         // solhint-disable-next-line avoid-low-level-calls, avoid-call-value
