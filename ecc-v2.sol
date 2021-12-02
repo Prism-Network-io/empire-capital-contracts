@@ -1877,6 +1877,8 @@ contract ECC is Context, IERC20, Ownable {
         _isSniper[sniperAddress] = false;
     }
     
+    // owner only
+
     function addLiquidityHolder(address liquidityHolder) public onlyOwner() {
         _liquidityHolders[liquidityHolder] = true;
     }
@@ -1900,8 +1902,6 @@ contract ECC is Context, IERC20, Ownable {
 
         emit SetMaxTxPercent(maxTxPercent);
     }
-
-    // owner only
 
     function setSwapAndLiquifyEnabled(bool _enabled) external onlyOwner() {
         swapAndLiquifyEnabled = _enabled;
