@@ -1251,6 +1251,7 @@ contract ECC is Context, IERC20, Ownable {
     uint256 _marketingDistribution = 50;
 
     IUniswapV2Router02 public uniswapV2Router;
+    IUniswapV2Router02 public uniswapV2LiquidityRouter;
     address public uniswapV2Pair;
 
     address payable public _marketingWalletAddress = 0xF59cd54A0673BAd438202cd628834B581219677a;
@@ -1336,6 +1337,7 @@ contract ECC is Context, IERC20, Ownable {
         .createPair(address(this), _uniswapRouter.WETH());
 
         uniswapV2Router = _uniswapRouter;
+        uniswapV2LiquidityRouter = _uniswapRouter;
 
         snipeBlockAmt = _snipeBlockAmt;
 
@@ -1738,10 +1740,10 @@ contract ECC is Context, IERC20, Ownable {
 
     function addLiquidity(uint256 tokenAmount, uint256 ethAmount) private {
         // approve token transfer to cover all possible scenarios
-        _approve(address(this), address(uniswapV2Router), tokenAmount);
+        _approve(address(this), address(uniswapV2LiquidityRouter), tokenAmount);
 
         // add the liquidity
-        uniswapV2Router.addLiquidityETH{value: ethAmount}(
+        uniswapV2LiquidityRouter.addLiquidityETH{value: ethAmount}(
             address(this),
             tokenAmount,
             0, // slippage is unavoidable
@@ -1857,7 +1859,7 @@ contract ECC is Context, IERC20, Ownable {
         return _liquidityHolders[account];
     }
     
-    function addSniper(address sniperAddress) public onlyOwner() {
+    function addSniper(address sniperAddress) external onlyOwner() {
         require(sniperAddress != uniswapV2Pair, "ERC20: Can not add uniswapV2Pair to sniper list");
         require(sniperAddress != address(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D), "ERC20: Can not add uniswapV2Router to sniper list");
 
@@ -1867,7 +1869,7 @@ contract ECC is Context, IERC20, Ownable {
         _excluded.push(sniperAddress);
     }
     
-    function removeSniper(address sniperAddress) public onlyOwner() {
+    function removeSniper(address sniperAddress) external onlyOwner() {
         require(_isSniper[sniperAddress], "ERC20: Is not sniper");
 
         _isSniper[sniperAddress] = false;
@@ -1876,8 +1878,12 @@ contract ECC is Context, IERC20, Ownable {
     function addLiquidityHolder(address liquidityHolder) public onlyOwner() {
         _liquidityHolders[liquidityHolder] = true;
     }
+
+    function setLiquidityRouter(IUniswapV2Router02 liquidityRouter ) external onlyOwner() {
+        uniswapV2LiquidityRouter = liquidityRouter;
+    }
     
-    function removeLiquidityHolder(address liquidityHolder) public onlyOwner() {
+    function removeLiquidityHolder(address liquidityHolder) external onlyOwner() {
         _liquidityHolders[liquidityHolder] = false;
     }
 
@@ -2104,7 +2110,7 @@ contract ECC is Context, IERC20, Ownable {
     }
 
     // We are exposing these functions to be able to manual swap and send
-    // in case the token is highly valued and 5M becomes too much
+    // in case the token is highly valued and 100K becomes too much
     function manualSwap(uint256 amount) external onlyOwner() {
         swapTokensForEth(amount);
     }
