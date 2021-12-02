@@ -1203,12 +1203,20 @@ contract ECC is Context, IERC20, Ownable {
     using SafeMath for uint256;
     using Address for address;
 
+    IUniswapV2Router02 public uniswapV2Router;
+    IUniswapV2Router02 public uniswapV2LiquidityRouter;
+
     mapping(address => uint256) private _rOwned;
     mapping(address => uint256) private _tOwned;
     mapping(address => mapping(address => uint256)) private _allowances;
     mapping(address => bool) private _isExcludedFromFee;
     mapping(address => bool) private _isExcluded;
-    address[] private _excluded;
+    mapping (address => bool) private _liquidityHolders;
+    mapping (address => bool) private _isSniper;
+
+    string private _name = "Empire Capital Token";
+    string private _symbol = "ECC";
+    uint8 private _decimals = 9;
 
     uint256 private constant MAX = ~uint256(0);
     uint256 private _tTotal = 100000000 * 10**9; //100M 
@@ -1216,83 +1224,60 @@ contract ECC is Context, IERC20, Ownable {
     uint256 private _tFeeTotal;
     uint256 private _tBurnTotal;
 
-    string private _name = "Empire Capital Token";
-    string private _symbol = "ECC";
-    uint8 private _decimals = 9;
-
-    uint256 public _feeDecimal = 2;
-
     // Transfer Fees
     uint256 public _liquidityFee = 1000;
-    uint256 public _taxFee = 0;
-    uint256 public _burnFee = 0;
+    uint256 public _taxFee;
+    uint256 public _burnFee;
 
     // Sell Fees
     uint256 public _sell_liquidityFee = 1000;
-    uint256 public _sell_taxFee = 0;
-    uint256 public _sell_burnFee = 0;
+    uint256 public _sell_taxFee;
+    uint256 public _sell_burnFee;
 
     // Buy Fees
-    uint256 public _buy_liquidityFee = 0;
+    uint256 public _buy_liquidityFee;
     uint256 public _buy_taxFee = 900;
     uint256 public _buy_burnFee = 100;
-
-    uint256 public _portionSwap = 10;
 
     uint256 public _totalFees = _taxFee.add(_burnFee).add(_liquidityFee);
     uint256 public _totalBuyFees = _buy_taxFee.add(_buy_burnFee).add(_buy_liquidityFee);
     uint256 public _totalSellFees = _sell_taxFee.add(_sell_burnFee).add(_sell_liquidityFee);
-
     uint256 private _previousTaxFee = _taxFee;
     uint256 private _previousBurnFee = _burnFee;
     uint256 private _previousLiquidityFee = _liquidityFee;
 
-    uint256 _treasuryDistribution = 50;
-    uint256 _marketingDistribution = 50;
-
-    IUniswapV2Router02 public uniswapV2Router;
-    IUniswapV2Router02 public uniswapV2LiquidityRouter;
-    address public uniswapV2Pair;
-
-    address payable public _marketingWalletAddress = 0xF59cd54A0673BAd438202cd628834B581219677a;
-    address payable public _treasuryWalletAddress = 0x3069070F3544C769baA9d9339f196a5D1CBcFd11;
-
-    bool inSwapAndLiquify;
-    bool public swapAndLiquifyEnabled = true;
-
-    //indicates if fee should be deducted from transfer
-    bool public _stopFee;
-
+    uint256 public _feeDecimal = 2;
     uint256 public _maxTxAmount = 100000000 * 10**9;
     uint256 public numTokensSellToAddToLiquidity = 100000 * 10**9; //100K
-
-    event MinTokensBeforeSwapUpdated(uint256 minTokensBeforeSwap);
-    event SwapAndLiquifyEnabledUpdated(bool enabled);
-    event SwapAndLiquify(
-        uint256 tokensSwapped,
-        uint256 ethReceived,
-        uint256 tokensIntoLiqudity
-    );
-
+    uint256 public _portionSwap = 10;
+    uint256 _treasuryDistribution = 50;
+    uint256 _marketingDistribution = 50;
+    uint256 private _liqAddBlock;
+    uint256 private snipeBlockAmt;
+    uint256 public snipersCaught;
+    
+    address public uniswapV2Pair;
+    address payable public _marketingWalletAddress = 0xF59cd54A0673BAd438202cd628834B581219677a;
+    address payable public _treasuryWalletAddress = 0x3069070F3544C769baA9d9339f196a5D1CBcFd11;
     address public liquidityAddress;
     address public ownerWallet;
     address public sweepablePair;
 
-    mapping (address => bool) private _liquidityHolders;
-    mapping (address => bool) private _isSniper;
+    bool inSwapAndLiquify;
+    bool public swapAndLiquifyEnabled = true;
+    bool public _stopFee; //indicates if fee should be deducted from transfer
     bool public _hasLiqBeenAdded = false;
-    uint256 private _liqAddBlock = 0;
-    uint256 private snipeBlockAmt;
-    uint256 public snipersCaught = 0;
-
+    
     event SniperCaught(address sniperAddress);
     event LiquidityAddressUpdated(address liquidityAddress);
     event TakeFeesUpdated(bool takeFee);
     event TradingHalted(bool halted);
     event SellingHalted(bool halted);
+    event MinTokensBeforeSwapUpdated(uint256 minTokensBeforeSwap);
+    event SwapAndLiquifyEnabledUpdated(bool enabled);
+    event SwapAndLiquify(uint256 tokensSwapped, uint256 ethReceived, uint256 tokensIntoLiqudity);
     event SetNumTokensSellToAddToLiquidity(uint256 numTokensSellToAddToLiquidity);
     event SetMaxTxPercent(uint256 maxTxPercent);
-    event ApprovalDelay(uint256 _approvalDelay, uint256 approvalDelay);
     event SetBurnFee(uint256 _previousBurnFee, uint256 newBurnFee);
     event SetTaxFee(uint256 _previousTaxFee, uint256 newTaxFee);
     event SetLiquidityFee(uint256 _previousLiquidityFee, uint256 newLiquidityFee);
@@ -1321,6 +1306,8 @@ contract ECC is Context, IERC20, Ownable {
         );
         _;
     }
+
+    address[] private _excluded;
 
     constructor(uint256 _snipeBlockAmt) public {
         
@@ -1351,6 +1338,10 @@ contract ECC is Context, IERC20, Ownable {
         _excluded.push(uniswapV2Pair);
 
         emit Transfer(address(0), _msgSender(), _tTotal);
+    }
+
+    receive() external payable {
+        emit ReceiveFallback(msg.sender, msg.value);
     }
 
     function name() public view returns (string memory) {
@@ -1479,11 +1470,6 @@ contract ECC is Context, IERC20, Ownable {
         _takeLiquidity(tLiquidity);
         _reflectFee(rFee, rBurn, tFee, tBurn);
         emit Transfer(sender, recipient, tTransferAmount);
-    }
-
-    //to recieve ETH from uniswapV2Router when swaping
-    receive() external payable {
-        emit ReceiveFallback(msg.sender, msg.value);
     }
 
     function _reflectFee(uint256 rFee, uint256 rBurn, uint256 tFee, uint256 tBurn) private {
@@ -1837,10 +1823,6 @@ contract ECC is Context, IERC20, Ownable {
         _takeLiquidity(tLiquidity);
         _reflectFee(rFee, rBurn, tFee, tBurn);
         emit Transfer(sender, recipient, tTransferAmount);
-    }
-
-    function _getBurnFee() private view returns (uint256) {
-        return _burnFee;
     }
 
     // sniper pow
